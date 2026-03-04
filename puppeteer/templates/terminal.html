@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go Code Animation</title>
+    <link rel="stylesheet" href="/static/css/prism.css">
+    <link rel="stylesheet" href="/static/css/terminal.css">
+    <link rel="stylesheet" href="/static/css/fira-code.css">
+</head>
+<body class="{{.Theme}}">
+    <div class="container">
+        <div class="terminal" data-termynal data-termynal-no-delay>
+            <span class="prompt-line">
+                <span class="prompt">$</span>
+                <span class="command">go run main.go</span>
+            </span>
+            <span class="output-line">
+                <pre class="output"><code class="language-go" data-termynal>{{.Code}}</code></pre>
+            </span>
+        </div>
+    </div>
+    <script src="/static/js/prism.js"></script>
+    <script src="/static/js/termynal.js"></script>
+    <script>
+        // Initialize Termynal
+        const termynal = new Termynal('.terminal', {
+            startDelay: {{.StartDelay}},
+            typeDelay: {{.TypingSpeedMs}},
+            lineDelay: {{.LineDelayMs}},
+        });
+
+        // Signal that animation has started
+        window.addEventListener('load', () => {
+            if (window.parent !== window) {
+                window.parent.postMessage({ type: 'animation-start' }, '*');
+            }
+        });
+
+        // Signal that animation has completed
+        termynal.container.addEventListener('termynal-complete', () => {
+            if (window.parent !== window) {
+                window.parent.postMessage({ type: 'animation-complete' }, '*');
+            }
+        });
+
+        // Add custom complete event to Termynal
+        const originalInit = termynal.init;
+        termynal.init = function() {
+            originalInit.call(this);
+            setTimeout(() => {
+                this.container.dispatchEvent(new Event('termynal-complete'));
+            }, this.getRemainingTime());
+        };
+    </script>
+</body>
+</html>
