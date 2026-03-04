@@ -1,0 +1,197 @@
+/* Terminal styles for video generation */
+
+body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Fira Code', 'Courier New', monospace;
+}
+
+body.dark {
+    background-color: #1a1a1a;
+    color: #e0e0e0;
+}
+
+body.light {
+    background-color: #f0f0f0;
+    color: #333333;
+}
+
+.container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 40px;
+}
+
+.terminal {
+    background-color: #1e1e1e;
+    border-radius: 8px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+    font-family: 'Fira Code', 'Courier New', monospace;
+    font-size: 16px;
+    line-height: 1.6;
+}
+
+body.light .terminal {
+    background-color: #ffffff;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+}
+
+.terminal-inner {
+    padding: 24px;
+}
+
+.prompt-line {
+    display: flex;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.prompt {
+    color: #4ec9b0;
+    font-weight: bold;
+    margin-right: 8px;
+}
+
+.command {
+    color: #dcdcaa;
+}
+
+.output-line {
+    margin-top: 12px;
+    margin-bottom: 12px;
+}
+
+.output {
+    margin: 0;
+    padding: 0;
+    overflow-x: auto;
+}
+
+.output code {
+    font-family: 'Fira Code', 'Courier New', monospace !important;
+    font-variant-ligatures: normal;
+    -webkit-font-variant-ligatures: normal;
+    font-feature-settings: "calt" 1, "liga" 1, "ss01" 1, "ss02" 1, "ss03" 1;
+}
+
+/* Syntax highlighting overrides for video */
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata {
+    color: #6a9955;
+}
+
+.token.punctuation {
+    color: #d4d4d4;
+}
+
+.token.namespace {
+    opacity: .7;
+}
+
+.token.property,
+.token.tag,
+.token.boolean,
+.token.number,
+.token.constant,
+.token.symbol,
+.token.deleted {
+    color: #b5cea8;
+}
+
+.token.selector,
+.token.attr-name,
+.token.string,
+.token.char,
+.token.builtin,
+.token.inserted {
+    color: #ce9178;
+}
+
+.token.operator,
+.token.entity,
+.token.url,
+.language-css .token.string,
+.style .token.string {
+    color: #d4d4d4;
+}
+
+.token.atrule,
+.token.attr-value,
+.token.keyword {
+    color: #c586c0;
+}
+
+.token.function,
+.token.class-name {
+    color: #dcdcaa;
+}
+
+.token.regex,
+.token.important,
+.token.variable {
+    color: #d16969;
+}
+
+body.light .token.comment,
+body.light .token.prolog,
+body.light .token.doctype,
+body.light .token.cdata {
+    color: #008000;
+}
+
+body.light .token.punctuation {
+    color: #000;
+}
+
+body.light .token.namespace {
+    opacity: .7;
+}
+
+body.light .token.property,
+body.light .token.tag,
+body.light .token.boolean,
+body.light .token.number,
+body.light .token.constant,
+body.light .token.symbol,
+body.light .token.deleted {
+    color: #098658;
+}
+
+body.light .token.selector,
+body.light .token.attr-name,
+body.light .token.string,
+body.light .token.char,
+body.light .token.builtin,
+body.light .token.inserted {
+    color: #a31515;
+}
+
+body.light .token.operator,
+body.light .token.entity,
+body.light .token.url,
+body.light .language-css .token.string,
+body.light .style .token.string {
+    color: #000;
+}
+
+body.light .token.atrule,
+body.light .token.attr-value,
+body.light .token.keyword {
+    color: #0000ff;
+}
+
+body.light .token.function,
+body.light .token.class-name {
+    color: #795e26;
+}
+
+body.light .token.regex,
+body.light .token.important,
+body.light .token.variable {
+    color: #e90;
+}
