@@ -1,248 +1,139 @@
 const express = require('express');
 const puppeteer = require('puppeteer');
 const path = require('path');
-const fs = require('fs').promises;
-const { exec } = require('child_process');
-const { promisify } = require('util');
-const execAsync = promisify(exec);
+const fs = require('fs');
+const { execSync } = require('child_process');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
-const OUTPUT_DIR = process.env.OUTPUT_DIR || '/app/output/videos';
-const TEMPLATE_DIR = path.join(__dirname, 'templates');
-const STATIC_DIR = path.join(__dirname, '../static');
-
-// Ensure output directory exists
-fs.mkdir(OUTPUT_DIR, { recursive: true }).catch(console.error);
-
-// Middleware
 app.use(express.json({ limit: '10mb' }));
-app.use('/static', express.static(STATIC_DIR));
+app.use('/static', express.static(path.join(__dirname, '..', 'static')));
 
-// Health check
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', service: 'puppeteer' });
+const PORT = process.env.PORT || 3000;
+const templatePath = path.join(__dirname, 'templates', 'terminal.html');
+
+// GET /terminal?lang=go — отдаёт HTML шаблон через HTTP
+// Нужно чтобы Puppeteer загружал страницу через URL и /static/ ресурсы резолвились
+app.get('/terminal', (req, res) => {
+  const lang = req.query.lang || 'go';
+  const html = fs.readFileSync(templatePath, 'utf8');
+  res.send(html);
 });
 
-// Generate video from code
-app.post('/generate', async (req, res) => {
-  try {
-    const { code, output_path, duration_ms, width, height, typing_speed_ms } = req.body;
+// POST /render — генерирует MP4 из переданного кода
+// Body: { code, lang, slug, outputPath, width, height, fps, audioDuration, narration }
+app.post('/render', async (req, res) => {
+  const {
+    code,
+    lang = 'go',
+    slug,
+    outputPath,
+    width = 1080,
+    height = 1920,
+    fps = 30,
+    audioDuration = 50,
+    subtitleWords = [],
+  } = req.body;
 
-    if (!code || !output_path) {
-      return res.status(400).json({ error: 'Missing required parameters' });
-    }
-
-    console.log(`Generating video for: ${output_path}`);
-    console.log(`Duration: ${duration_ms}ms, Size: ${width}x${height}`);
-
-    const result = await generateCodeVideo(code, output_path, {
-      durationMs: duration_ms || 12000,
-      width: width || 1080,
-      height: height || 1920,
-      typingSpeedMs: typing_speed_ms || 50,
-    });
-
-    res.json({ video_path: result.videoPath, duration_ms: result.durationMs });
-  } catch (error) {
-    console.error('Error generating video:', error);
-    res.status(500).json({ error: error.message });
+  if (!code || !outputPath) {
+    return res.status(400).json({ error: 'code и outputPath обязательны' });
   }
-});
 
-// Generate video with audio
-app.post('/generate-with-audio', async (req, res) => {
-  try {
-    const { code, audio_path, output_path, duration_ms, width, height, typing_speed_ms } = req.body;
+  const screenshotsDir = path.join(path.dirname(outputPath), 'frames', slug || 'tmp');
+  fs.mkdirSync(screenshotsDir, { recursive: true });
 
-    if (!code || !output_path) {
-      return res.status(400).json({ error: 'Missing required parameters' });
-    }
-
-    console.log(`Generating video with audio for: ${output_path}`);
-
-    // First generate the video
-    const videoResult = await generateCodeVideo(code, output_path + '.tmp.mp4', {
-      durationMs: duration_ms || 12000,
-      width: width || 1080,
-      height: height || 1920,
-      typingSpeedMs: typing_speed_ms || 50,
-    });
-
-    // If audio is provided, combine with video
-    let finalPath = videoResult.videoPath;
-    if (audio_path) {
-      finalPath = await combineVideoAudio(videoResult.videoPath, audio_path, output_path);
-    } else {
-      // Just rename temp file
-      await fs.rename(videoResult.videoPath, output_path);
-      finalPath = output_path;
-    }
-
-    res.json({ video_path: finalPath, duration_ms: videoResult.durationMs });
-  } catch (error) {
-    console.error('Error generating video with audio:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Generate code video
-async function generateCodeVideo(code, outputPath, options) {
   let browser;
   try {
     browser = await puppeteer.launch({
       headless: 'new',
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
-        '--disable-gpu',
+        `--window-size=${width},${height}`,
       ],
     });
 
     const page = await browser.newPage();
+    await page.setViewport({ width, height });
 
-    // Read template
-    const templatePath = path.join(TEMPLATE_DIR, 'terminal.html');
-    let template = await fs.readFile(templatePath, 'utf-8');
-
-    // Escape special characters for Go code
-    const escapedCode = code
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#039;');
-
-    // Replace placeholders
-    template = template.replace(/\{\{\.Code\}\}/g, escapedCode);
-    template = template.replace(/\{\{\.StartDelay\}\}/g, '100');
-    template = template.replace(/\{\{\.TypingSpeedMs\}\}/g, String(options.typingSpeedMs));
-    template = template.replace(/\{\{\.LineDelayMs\}\}/g, '0');
-    template = template.replace(/\{\{\.Theme\}\}/g, 'dark');
-
-    // Set content
-    await page.setContent(template, { waitUntil: 'networkidle0' });
-
-    // Wait for animation to complete
-    const animationComplete = new Promise((resolve) => {
-      page.on('console', (msg) => {
-        if (msg.text() === 'Animation complete') {
-          resolve();
-        }
-      });
+    // Загружаем через HTTP — так /static/ ресурсы (highlight.js, шрифты) резолвятся корректно
+    await page.goto(`http://localhost:${PORT}/terminal?lang=${encodeURIComponent(lang)}`, {
+      waitUntil: 'networkidle0',
     });
 
-    // Wait for timeout or animation completion
-    await Promise.race([
-      animationComplete,
-      new Promise(resolve => setTimeout(resolve, options.durationMs + 2000)),
-    ]);
+    // Анимируем посимвольный ввод кода и делаем скриншоты кадров
+    const totalFrames = Math.ceil(audioDuration * fps);
+    const totalChars = code.length;
+    const charsPerFrame = Math.max(1, totalChars / (totalFrames * 0.7)); // анимация на 70% времени
 
-    // Capture video using ffmpeg
-    const tempVideoPath = outputPath;
+    // Слова для субтитров (display-версия, без +)
+    const subtitleDisplayWords = subtitleWords.map(w => w.word);
 
-    // Use ffmpeg to capture the video
-    await captureVideo(page, tempVideoPath, options);
+    // Для каждого кадра заранее вычисляем индекс текущего слова
+    // по временным меткам startSec каждого слова
+    const frameWordIdx = new Int32Array(totalFrames).fill(-1);
+    for (let wi = 0; wi < subtitleWords.length; wi++) {
+      const startFrame = Math.floor(subtitleWords[wi].startSec * fps);
+      const endFrame = wi + 1 < subtitleWords.length
+        ? Math.floor(subtitleWords[wi + 1].startSec * fps)
+        : totalFrames;
+      for (let f = Math.max(0, startFrame); f < Math.min(endFrame, totalFrames); f++) {
+        frameWordIdx[f] = wi;
+      }
+    }
+
+    let charsShown = 0;
+    for (let frame = 0; frame < totalFrames; frame++) {
+      if (frame < totalFrames * 0.7) {
+        charsShown = Math.min(totalChars, Math.round(frame * charsPerFrame));
+      } else {
+        charsShown = totalChars; // остаток — показываем весь код
+      }
+
+      const partial = code.slice(0, charsShown);
+      const currentWordIdx = frameWordIdx[frame];
+
+      await page.evaluate((text, language, words, wordIdx) => {
+        if (typeof updateCode === 'function') updateCode(text, language);
+        if (typeof updateSubtitle === 'function') updateSubtitle(words, wordIdx);
+      }, partial, lang, subtitleDisplayWords, currentWordIdx);
+
+      const framePath = path.join(screenshotsDir, `frame-${String(frame).padStart(6, '0')}.png`);
+      await page.screenshot({ path: framePath, type: 'png' });
+    }
 
     await browser.close();
 
-    // Get video duration
-    const durationMs = await getVideoDuration(tempVideoPath);
+    // Сборка видео из кадров через FFmpeg
+    fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+    const ffmpegCmd = [
+      'ffmpeg -y',
+      `-framerate ${fps}`,
+      `-i "${path.join(screenshotsDir, 'frame-%06d.png')}"`,
+      '-c:v libx264',
+      '-pix_fmt yuv420p',
+      '-preset fast',
+      `-s ${width}x${height}`,
+      `"${outputPath}"`,
+    ].join(' ');
 
-    return { videoPath: tempVideoPath, durationMs };
-  } catch (error) {
-    if (browser) await browser.close();
-    throw error;
+    execSync(ffmpegCmd, { stdio: 'pipe' });
+
+    // Чистим кадры
+    fs.rmSync(screenshotsDir, { recursive: true, force: true });
+
+    res.json({ success: true, outputPath });
+  } catch (err) {
+    if (browser) await browser.close().catch(() => {});
+    console.error('Ошибка рендеринга:', err);
+    res.status(500).json({ error: err.message });
   }
-}
+});
 
-// Capture video using ffmpeg
-async function captureVideo(page, outputPath, options) {
-  const width = options.width;
-  const height = options.height;
-  const duration = (options.durationMs + 1000) / 1000; // Add 1 second buffer
+// GET /health
+app.get('/health', (_, res) => res.json({ status: 'ok' }));
 
-  // Save HTML to temp file for ffmpeg to read
-  const tempHtmlPath = `/tmp/video-${Date.now()}.html`;
-  const htmlContent = await page.content();
-  await fs.writeFile(tempHtmlPath, htmlContent);
-
-  // Use ffmpeg to capture video
-  const command = `ffmpeg -y -loop 1 -i "${tempHtmlPath}" -t ${duration} -vf "scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2" -c:v libx264 -tune stillimage -pix_fmt yuv420p -r 30 "${outputPath}"`;
-
-  try {
-    await execAsync(command);
-    console.log(`Video captured to: ${outputPath}`);
-  } catch (error) {
-    console.error('FFmpeg error:', error);
-    // Try alternative method with xvfb
-    await captureVideoWithXvfb(page, outputPath, options);
-  } finally {
-    // Clean up temp file
-    await fs.unlink(tempHtmlPath).catch(() => {});
-  }
-}
-
-// Alternative capture method with xvfb (for headless environments)
-async function captureVideoWithXvfb(page, outputPath, options) {
-  console.log('Using xvfb for video capture...');
-
-  const width = options.width;
-  const height = options.height;
-  const duration = (options.durationMs + 1000) / 1000;
-
-  // Save HTML to temp file
-  const tempHtmlPath = `/tmp/video-${Date.now()}.html`;
-  const htmlContent = await page.content();
-  await fs.writeFile(tempHtmlPath, htmlContent);
-
-  // Use xvfb-run with ffmpeg
-  const command = `xvfb-run -a --server-args="-screen 0 ${width}x${height}x24" ffmpeg -y -loop 1 -i "${tempHtmlPath}" -t ${duration} -vf "scale=${width}:${height}" -c:v libx264 -pix_fmt yuv420p -r 30 "${outputPath}"`;
-
-  try {
-    await execAsync(command);
-  } catch (error) {
-    throw new Error(`Failed to capture video: ${error.message}`);
-  } finally {
-    await fs.unlink(tempHtmlPath).catch(() => {});
-  }
-}
-
-// Combine video and audio using ffmpeg
-async function combineVideoAudio(videoPath, audioPath, outputPath) {
-  const duration = await getVideoDuration(videoPath);
-
-  const command = `ffmpeg -y -i "${videoPath}" -i "${audioPath}" -c:v copy -c:a aac -map 0:v:0 -map 1:a:0 -shortest -t ${duration / 1000} "${outputPath}"`;
-
-  try {
-    await execAsync(command);
-    console.log(`Combined video and audio to: ${outputPath}`);
-
-    // Clean up temp video
-    await fs.unlink(videoPath).catch(() => {});
-
-    return outputPath;
-  } catch (error) {
-    throw new Error(`Failed to combine video and audio: ${error.message}`);
-  }
-}
-
-// Get video duration using ffprobe
-async function getVideoDuration(videoPath) {
-  try {
-    const command = `ffprobe -v error -show_entries format=duration -of json "${videoPath}"`;
-    const { stdout } = await execAsync(command);
-    const result = JSON.parse(stdout);
-    return Math.round(result.format.duration * 1000);
-  } catch (error) {
-    console.error('Failed to get video duration:', error);
-    return 0;
-  }
-}
-
-// Start server
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Puppeteer server running on port ${PORT}`);
-  console.log(`Output directory: ${OUTPUT_DIR}`);
+app.listen(PORT, () => {
+  console.log(`Puppeteer сервис запущен на порту ${PORT}`);
 });

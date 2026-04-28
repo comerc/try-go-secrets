@@ -2,187 +2,93 @@ package agents
 
 import (
 	"fmt"
-	"io/fs"
 	"math/rand"
+	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
-	"strings"
-	"time"
+	"strconv"
 
-	"github.com/aka/semarang/pkg/state"
+	"go-secrets-pipeline/pkg/state"
 )
 
-// ContentSelector handles selecting content files for processing
-type ContentSelector struct {
-	rawDir          string
-	processedMgr    *state.ProcessedManager
-	fileNumberRegex *regexp.Regexp
-}
+var reLineNum = regexp.MustCompile(`(?:__|-)line-(\d+)\.md$`)
 
-// NewContentSelector creates a new ContentSelector
-func NewContentSelector(rawDir string, processedMgr *state.ProcessedManager) (*ContentSelector, error) {
-	// Regex to match files with line numbers: *-line-<NUM>.md
-	regex, err := regexp.Compile(`line-(\d+)\.md$`)
+// SelectContent выбирает markdown-файл по номеру или случайно из необработанных
+func SelectContent(rawDir string, ps *state.ProcessedState, num int) (string, int, error) {
+	files, err := filepath.Glob(filepath.Join(rawDir, "*.md"))
 	if err != nil {
-		return nil, fmt.Errorf("failed to compile file number regex: %w", err)
+		return "", 0, fmt.Errorf("ошибка чтения директории raw: %w", err)
+	}
+	if len(files) == 0 {
+		return "", 0, fmt.Errorf("в директории %s нет .md файлов", rawDir)
 	}
 
-	return &ContentSelector{
-		rawDir:          rawDir,
-		processedMgr:    processedMgr,
-		fileNumberRegex: regex,
-	}, nil
-}
-
-// FileNumber represents a file with its number
-type FileNumber struct {
-	Path     string
-	Filename string
-	Number   int
-}
-
-// SelectByNumber selects a file by its line number
-func (cs *ContentSelector) SelectByNumber(number int) (string, error) {
-	files, err := cs.ParseFileNames()
-	if err != nil {
-		return "", fmt.Errorf("failed to parse file names: %w", err)
+	if num > 0 {
+		return selectByNum(files, num, ps)
 	}
+	return selectRandom(files, ps)
+}
 
-	// Find file with matching number
-	for _, fn := range files {
-		if fn.Number == number {
-			// Check if already processed
-			if cs.processedMgr.IsProcessed(fn.Filename) {
-				return "", fmt.Errorf("file %s (number %d) has already been processed",
-					fn.Filename, number)
+func selectByNum(files []string, num int, ps *state.ProcessedState) (string, int, error) {
+	target := fmt.Sprintf("%03d", num)
+	for _, f := range files {
+		m := reLineNum.FindStringSubmatch(f)
+		if m == nil {
+			continue
+		}
+		if m[1] == target || stripLeadingZeros(m[1]) == strconv.Itoa(num) {
+			if ps.IsProcessed(num) {
+				return "", 0, fmt.Errorf("файл #%d уже обработан", num)
 			}
-			return fn.Path, nil
+			return f, num, nil
 		}
 	}
-
-	return "", fmt.Errorf("no file found with number %d", number)
+	return "", 0, fmt.Errorf("файл с номером %d не найден", num)
 }
 
-// SelectRandom selects a random unprocessed file
-func (cs *ContentSelector) SelectRandom() (string, error) {
-	files, err := cs.ParseFileNames()
-	if err != nil {
-		return "", fmt.Errorf("failed to parse file names: %w", err)
+func selectRandom(files []string, ps *state.ProcessedState) (string, int, error) {
+	var unprocessed []struct {
+		path string
+		num  int
 	}
 
-	// Filter unprocessed files
-	unprocessed := make([]FileNumber, 0)
-	processedFiles := cs.processedMgr.GetProcessedFiles()
-
-	for _, fn := range files {
-		if !processedFiles[fn.Filename] {
-			unprocessed = append(unprocessed, fn)
+	for _, f := range files {
+		m := reLineNum.FindStringSubmatch(f)
+		if m == nil {
+			continue
+		}
+		n, err := strconv.Atoi(m[1])
+		if err != nil {
+			continue
+		}
+		if !ps.IsProcessed(n) {
+			unprocessed = append(unprocessed, struct {
+				path string
+				num  int
+			}{f, n})
 		}
 	}
 
 	if len(unprocessed) == 0 {
-		return "", fmt.Errorf("no unprocessed files available")
+		return "", 0, fmt.Errorf("все файлы уже обработаны")
 	}
 
-	// Select random file
-	rand.Seed(time.Now().UnixNano())
-	selected := unprocessed[rand.Intn(len(unprocessed))]
-
-	return selected.Path, nil
+	// Случайный выбор с воспроизводимостью через os entropy
+	idx := rand.Intn(len(unprocessed))
+	chosen := unprocessed[idx]
+	return chosen.path, chosen.num, nil
 }
 
-// ParseFileNames parses all markdown files in the raw directory
-func (cs *ContentSelector) ParseFileNames() ([]FileNumber, error) {
-	var files []FileNumber
-
-	err := filepath.WalkDir(cs.rawDir, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-
-		// Skip directories
-		if d.IsDir() {
-			return nil
-		}
-
-		// Check if it's a markdown file
-		if !strings.HasSuffix(path, ".md") {
-			return nil
-		}
-
-		// Check if it has a line number
-		filename := filepath.Base(path)
-		match := cs.fileNumberRegex.FindStringSubmatch(filename)
-		if match != nil && len(match) > 1 {
-			var number int
-			_, err := fmt.Sscanf(match[1], "%d", &number)
-			if err != nil {
-				// Invalid number, skip
-				return nil
-			}
-
-			files = append(files, FileNumber{
-				Path:     path,
-				Filename: filename,
-				Number:   number,
-			})
-		}
-
-		return nil
-	})
-
+func stripLeadingZeros(s string) string {
+	n, err := strconv.Atoi(s)
 	if err != nil {
-		return nil, err
+		return s
 	}
-
-	// Sort by number
-	sort.Slice(files, func(i, j int) bool {
-		return files[i].Number < files[j].Number
-	})
-
-	return files, nil
+	return strconv.Itoa(n)
 }
 
-// GetUnprocessedCount returns the count of unprocessed files
-func (cs *ContentSelector) GetUnprocessedCount() (int, error) {
-	files, err := cs.ParseFileNames()
-	if err != nil {
-		return 0, err
-	}
-
-	processedFiles := cs.processedMgr.GetProcessedFiles()
-	unprocessed := 0
-
-	for _, fn := range files {
-		if !processedFiles[fn.Filename] {
-			unprocessed++
-		}
-	}
-
-	return unprocessed, nil
-}
-
-// GetTotalCount returns the total count of markdown files
-func (cs *ContentSelector) GetTotalCount() (int, error) {
-	files, err := cs.ParseFileNames()
-	if err != nil {
-		return 0, err
-	}
-	return len(files), nil
-}
-
-// GetProgress returns the progress of processing (0.0 to 1.0)
-func (cs *ContentSelector) GetProgress() (float64, error) {
-	total, err := cs.GetTotalCount()
-	if err != nil {
-		return 0, err
-	}
-
-	if total == 0 {
-		return 1.0, nil
-	}
-
-	processed := cs.processedMgr.GetCount()
-	return float64(processed) / float64(total), nil
+// FileExists проверяет существование файла
+func FileExists(path string) bool {
+	_, err := os.Stat(path)
+	return !os.IsNotExist(err)
 }

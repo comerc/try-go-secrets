@@ -2,183 +2,123 @@ package services
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"os/exec"
+	"strings"
 	"time"
+
+	"go-secrets-pipeline/pkg/config"
 )
 
-// Message represents a chat message for the LLM
-type Message struct {
-	Role    string `json:"role"`    // "system", "user", "assistant"
+type LLMService struct {
+	cfg    *config.Config
+	client *http.Client
+}
+
+type llmRequest struct {
+	Model    string       `json:"model"`
+	Messages []llmMessage `json:"messages"`
+}
+
+type llmMessage struct {
+	Role    string `json:"role"`
 	Content string `json:"content"`
 }
 
-// ChatRequest represents a chat completion request
-type ChatRequest struct {
-	Model    string    `json:"model"`
-	Messages []Message `json:"messages"`
+type llmResponse struct {
+	Choices []struct {
+		Message llmMessage `json:"message"`
+	} `json:"choices"`
+	Error *struct {
+		Message string `json:"message"`
+	} `json:"error,omitempty"`
 }
 
-// ChatResponse represents a chat completion response
-type ChatResponse struct {
-	ID      string   `json:"id"`
-	Object  string   `json:"object"`
-	Created int64    `json:"created"`
-	Model   string   `json:"model"`
-	Choices []Choice `json:"choices"`
-	Usage   Usage    `json:"usage"`
-}
-
-// Choice represents a completion choice
-type Choice struct {
-	Index        int     `json:"index"`
-	Message      Message `json:"message"`
-	FinishReason string  `json:"finish_reason"`
-}
-
-// Usage represents token usage
-type Usage struct {
-	PromptTokens     int `json:"prompt_tokens"`
-	CompletionTokens int `json:"completion_tokens"`
-	TotalTokens      int `json:"total_tokens"`
-}
-
-// LLMService handles interactions with the z.ai API
-type LLMService struct {
-	apiKey     string
-	baseURL    string
-	model      string
-	httpClient *http.Client
-}
-
-// NewLLMService creates a new LLMService
-func NewLLMService(apiKey, baseURL string) *LLMService {
+func NewLLMService(cfg *config.Config) *LLMService {
 	return &LLMService{
-		apiKey:  apiKey,
-		baseURL: baseURL,
-		model:   "glm-coding-pro",
-		httpClient: &http.Client{
-			Timeout: 60 * time.Second,
+		cfg:    cfg,
+		client: &http.Client{Timeout: 5 * time.Minute},
+	}
+}
+
+// Complete отправляет запрос к LLM-бэкенду и возвращает ответ
+func (s *LLMService) Complete(systemPrompt, userPrompt string) (string, error) {
+	if s.cfg.LLMBackend == "claude-cli" {
+		return s.completeCLI(systemPrompt, userPrompt)
+	}
+	return s.completeZAI(systemPrompt, userPrompt)
+}
+
+func (s *LLMService) completeCLI(systemPrompt, userPrompt string) (string, error) {
+	combined := systemPrompt + "\n\n---\n\n" + userPrompt
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "claude", "-p", combined, "--output-format", "text")
+	out, err := cmd.Output()
+	if err != nil {
+		if e, ok := err.(*exec.ExitError); ok {
+			return "", fmt.Errorf("claude-cli: %w\nstderr: %s", err, e.Stderr)
+		}
+		return "", fmt.Errorf("claude-cli: %w", err)
+	}
+
+	return strings.TrimSpace(string(out)), nil
+}
+
+func (s *LLMService) completeZAI(systemPrompt, userPrompt string) (string, error) {
+	reqBody := llmRequest{
+		Model: s.cfg.ZAIModel,
+		Messages: []llmMessage{
+			{Role: "system", Content: systemPrompt},
+			{Role: "user", Content: userPrompt},
 		},
 	}
-}
 
-// SetModel sets the model to use
-func (s *LLMService) SetModel(model string) {
-	s.model = model
-}
-
-// ChatCompletion performs a chat completion request
-func (s *LLMService) ChatCompletion(messages []Message) (string, error) {
-	req := ChatRequest{
-		Model:    s.model,
-		Messages: messages,
+	data, err := json.Marshal(reqBody)
+	if err != nil {
+		return "", err
 	}
 
-	reqBody, err := json.Marshal(req)
+	req, err := http.NewRequest("POST", s.cfg.ZAIApiURL+"/chat/completions", bytes.NewReader(data))
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal request: %w", err)
+		return "", err
 	}
+	req.Header.Set("Authorization", "Bearer "+s.cfg.ZAIApiKey)
+	req.Header.Set("Content-Type", "application/json")
 
-	httpReq, err := http.NewRequest("POST", s.baseURL+"/chat/completions", bytes.NewReader(reqBody))
+	resp, err := s.client.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("failed to create request: %w", err)
-	}
-
-	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Authorization", "Bearer "+s.apiKey)
-
-	resp, err := s.httpClient.Do(httpReq)
-	if err != nil {
-		return "", fmt.Errorf("failed to send request: %w", err)
+		return "", fmt.Errorf("z.ai запрос: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("failed to read response: %w", err)
+		return "", err
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(body))
+		return "", fmt.Errorf("z.ai ошибка %d: %s", resp.StatusCode, string(body))
 	}
 
-	var chatResp ChatResponse
-	if err := json.Unmarshal(body, &chatResp); err != nil {
-		return "", fmt.Errorf("failed to unmarshal response: %w", err)
+	var llmResp llmResponse
+	if err := json.Unmarshal(body, &llmResp); err != nil {
+		return "", fmt.Errorf("парсинг z.ai ответа: %w", err)
 	}
 
-	if len(chatResp.Choices) == 0 {
-		return "", fmt.Errorf("no choices in response")
+	if llmResp.Error != nil {
+		return "", fmt.Errorf("z.ai API error: %s", llmResp.Error.Message)
 	}
 
-	return chatResp.Choices[0].Message.Content, nil
-}
-
-// GenerateScript generates a video script from parsed content
-func (s *LLMService) GenerateScript(title, explanation, code string) (string, error) {
-	systemPrompt := `You are an expert YouTube Short script writer for programming content in Russian.
-Create engaging, conversational scripts for under 60-second videos.
-Use "ты" form (friendly, informal).
-Focus on the key insight/aha moment.
-Keep sentences short and punchy.
-Maximum 350 characters.`
-
-	userPrompt := fmt.Sprintf(`Create a 45-50 second Russian voice-over script for a YouTube Short about this Go secret.
-
-Title: %s
-
-Explanation: %s
-
-Code example: %s
-
-Requirements:
-- Natural, conversational Russian (like Alice from Yandex)
-- Use "ты" form (friendly, informal)
-- Keep sentences short and punchy
-- Max 350 characters (to fit within TTS limit)
-- Focus on the key insight/aha moment
-
-Return only the script text, no explanations.`, title, explanation, code)
-
-	messages := []Message{
-		{Role: "system", Content: systemPrompt},
-		{Role: "user", Content: userPrompt},
+	if len(llmResp.Choices) == 0 {
+		return "", fmt.Errorf("z.ai вернул пустой ответ")
 	}
 
-	return s.ChatCompletion(messages)
-}
-
-// GenerateScriptSimplified generates a simpler script without code
-func (s *LLMService) GenerateScriptSimplified(title, explanation string) (string, error) {
-	systemPrompt := `You are an expert YouTube Short script writer for programming content in Russian.
-Create engaging, conversational scripts for under 60-second videos.
-Use "ты" form (friendly, informal).
-Focus on the key insight/aha moment.
-Keep sentences short and punchy.
-Maximum 350 characters.`
-
-	userPrompt := fmt.Sprintf(`Create a 45-50 second Russian voice-over script for a YouTube Short about this Go secret.
-
-Title: %s
-
-Explanation: %s
-
-Requirements:
-- Natural, conversational Russian (like Alice from Yandex)
-- Use "ты" form (friendly, informal)
-- Keep sentences short and punchy
-- Max 350 characters (to fit within TTS limit)
-- Focus on the key insight/aha moment
-
-Return only the script text, no explanations.`, title, explanation)
-
-	messages := []Message{
-		{Role: "system", Content: systemPrompt},
-		{Role: "user", Content: userPrompt},
-	}
-
-	return s.ChatCompletion(messages)
+	return llmResp.Choices[0].Message.Content, nil
 }

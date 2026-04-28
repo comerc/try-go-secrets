@@ -11,246 +11,154 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/aka/semarang/pkg/models"
+	"go-secrets-pipeline/pkg/config"
+	"go-secrets-pipeline/pkg/models"
 )
 
-// VideoService handles video generation using Puppeteer service
 type VideoService struct {
-	puppeteerURL string
-	width        int
-	height       int
-	httpClient   *http.Client
+	cfg    *config.Config
+	client *http.Client
 }
 
-// NewVideoService creates a new VideoService
-func NewVideoService(puppeteerURL string, width, height int) *VideoService {
+// SubtitleWord — слово с временной меткой начала произношения (в секундах)
+type SubtitleWord struct {
+	Word     string  `json:"word"`
+	StartSec float64 `json:"startSec"`
+}
+
+type renderRequest struct {
+	Code          string         `json:"code"`
+	Lang          string         `json:"lang"`
+	Slug          string         `json:"slug"`
+	OutputPath    string         `json:"outputPath"`
+	Width         int            `json:"width"`
+	Height        int            `json:"height"`
+	FPS           int            `json:"fps"`
+	AudioDuration float64        `json:"audioDuration"`
+	SubtitleWords []SubtitleWord `json:"subtitleWords"`
+}
+
+type renderResponse struct {
+	Success    bool   `json:"success"`
+	OutputPath string `json:"outputPath"`
+	Error      string `json:"error"`
+}
+
+func NewVideoService(cfg *config.Config) *VideoService {
 	return &VideoService{
-		puppeteerURL: puppeteerURL,
-		width:        width,
-		height:       height,
-		httpClient: &http.Client{
-			Timeout: 120 * time.Second,
-		},
+		cfg:    cfg,
+		client: &http.Client{Timeout: 10 * time.Minute},
 	}
 }
 
-// GenerateVideo generates a video from a script
-func (s *VideoService) GenerateVideo(script *models.Script, audioDir, videosDir string) (string, error) {
-	var videoSegments []string
-
-	// Generate segments
-	for _, seg := range script.Segments {
-		switch seg.Type {
-		case "code":
-			videoPath, err := s.generateCodeVideo(seg.Content, seg.DurationMs, videosDir)
-			if err != nil {
-				return "", fmt.Errorf("failed to generate code video: %w", err)
-			}
-			videoSegments = append(videoSegments, videoPath)
-		case "diagram":
-			videoPath, err := s.generateDiagramVideo(seg.Content, seg.DurationMs, videosDir)
-			if err != nil {
-				return "", fmt.Errorf("failed to generate diagram video: %w", err)
-			}
-			videoSegments = append(videoSegments, videoPath)
-		case "voice":
-			// Voice segments are handled separately via TTS
-			// The TTS service will generate audio files
-		}
+// RenderCodeVideo запрашивает у Puppeteer-сервиса видео с анимацией кода
+func (s *VideoService) RenderCodeVideo(spec *models.VideoSpec, code, lang string, audioDuration float64, subtitleWords []SubtitleWord) (string, error) {
+	rawVideoPath := filepath.Join(
+		s.cfg.OutputDir, "videos", "raw", spec.Slug+"-code.mp4",
+	)
+	if err := os.MkdirAll(filepath.Dir(rawVideoPath), 0755); err != nil {
+		return "", err
 	}
 
-	// Combine all video segments
-	outputPath := filepath.Join(videosDir, script.GetSlug()+".mp4")
-
-	if len(videoSegments) == 0 {
-		return "", fmt.Errorf("no video segments to combine")
+	reqBody := renderRequest{
+		Code:          code,
+		Lang:          lang,
+		Slug:          spec.Slug,
+		OutputPath:    rawVideoPath,
+		Width:         spec.Width,
+		Height:        spec.Height,
+		FPS:           spec.FPS,
+		AudioDuration: audioDuration,
+		SubtitleWords: subtitleWords,
 	}
 
-	if len(videoSegments) == 1 {
-		// Just rename the single segment
-		if err := os.Rename(videoSegments[0], outputPath); err != nil {
-			return "", fmt.Errorf("failed to rename video: %w", err)
-		}
-		return outputPath, nil
-	}
-
-	// Combine multiple segments
-	if err := s.combineVideos(videoSegments, outputPath); err != nil {
-		return "", fmt.Errorf("failed to combine videos: %w", err)
-	}
-
-	return outputPath, nil
-}
-
-// GenerateVideoWithAudio generates a video and combines it with audio
-func (s *VideoService) GenerateVideoWithAudio(script *models.Script, audioDir, videosDir string) (string, error) {
-	var segmentFiles []string
-
-	// Process each segment
-	for _, seg := range script.Segments {
-		switch seg.Type {
-		case "voice":
-			// Use TTS audio file
-			audioPath := filepath.Join(audioDir, seg.TTSFile)
-			if _, err := os.Stat(audioPath); err == nil {
-				segmentFiles = append(segmentFiles, audioPath)
-			} else {
-				return "", fmt.Errorf("audio file not found: %s", audioPath)
-			}
-		case "code":
-			videoPath, err := s.generateCodeVideo(seg.Content, seg.DurationMs, videosDir)
-			if err != nil {
-				return "", fmt.Errorf("failed to generate code video: %w", err)
-			}
-			segmentFiles = append(segmentFiles, videoPath)
-		case "diagram":
-			videoPath, err := s.generateDiagramVideo(seg.Content, seg.DurationMs, videosDir)
-			if err != nil {
-				return "", fmt.Errorf("failed to generate diagram video: %w", err)
-			}
-			segmentFiles = append(segmentFiles, videoPath)
-		}
-	}
-
-	// Combine all segments into final video
-	outputPath := filepath.Join(videosDir, fmt.Sprintf("%s-%s.mp4", script.Date, script.GetSlug()))
-
-	if err := s.combineAllSegments(segmentFiles, outputPath); err != nil {
-		return "", fmt.Errorf("failed to combine segments: %w", err)
-	}
-
-	return outputPath, nil
-}
-
-// generateCodeVideo generates a video of code animation
-func (s *VideoService) generateCodeVideo(code string, durationMs int, outputDir string) (string, error) {
-	outputPath := filepath.Join(outputDir, fmt.Sprintf("code-%d.mp4", time.Now().UnixNano()))
-
-	reqBody := map[string]interface{}{
-		"code":           code,
-		"output_path":     outputPath,
-		"duration_ms":     durationMs,
-		"width":          s.width,
-		"height":         s.height,
-		"typing_speed_ms": 50,
-	}
-
-	body, err := json.Marshal(reqBody)
+	data, err := json.Marshal(reqBody)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal request: %w", err)
+		return "", err
 	}
 
-	resp, err := s.httpClient.Post(s.puppeteerURL+"/generate", "application/json", bytes.NewReader(body))
+	resp, err := s.client.Post(s.cfg.PuppeteerURL+"/render", "application/json", bytes.NewReader(data))
 	if err != nil {
-		return "", fmt.Errorf("failed to send request: %w", err)
+		return "", fmt.Errorf("Puppeteer запрос: %w", err)
 	}
 	defer resp.Body.Close()
 
+	body, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusOK {
-		respBody, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(respBody))
+		return "", fmt.Errorf("Puppeteer ошибка %d: %s", resp.StatusCode, string(body))
 	}
 
-	var result struct {
-		VideoPath  string `json:"video_path"`
-		DurationMs int    `json:"duration_ms"`
+	var renderResp renderResponse
+	if err := json.Unmarshal(body, &renderResp); err != nil {
+		return "", err
+	}
+	if !renderResp.Success {
+		return "", fmt.Errorf("Puppeteer render: %s", renderResp.Error)
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", fmt.Errorf("failed to decode response: %w", err)
-	}
-
-	return result.VideoPath, nil
+	return rawVideoPath, nil
 }
 
-// generateDiagramVideo generates a video of a diagram animation
-func (s *VideoService) generateDiagramVideo(diagram string, durationMs int, outputDir string) (string, error) {
-	// For now, treat diagrams as code (can be enhanced later)
-	return s.generateCodeVideo(diagram, durationMs, outputDir)
-}
-
-// combineVideos combines multiple video files into one
-func (s *VideoService) combineVideos(inputPaths []string, outputPath string) error {
-	// Build filter complex for concatenation
-	filterComplex := ""
-	for i := range inputPaths {
-		filterComplex += fmt.Sprintf("[%d:v]scale=%d:%d[v%d];", i, s.width, s.height, i)
+// MergeAudioVideo объединяет аудио и видео через FFmpeg
+func (s *VideoService) MergeAudioVideo(videoPath, audioPath, outputPath string) error {
+	if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
+		return err
 	}
 
-	// Concatenate video streams
-	concatInputs := ""
-	for i := range inputPaths {
-		if i > 0 {
-			concatInputs += ","
-		}
-		concatInputs += fmt.Sprintf("v%d", i)
-	}
-	filterComplex += fmt.Sprintf("%sconcat=n=%d:v=1[outv]", concatInputs, len(inputPaths))
-
-	// Build ffmpeg command
-	args := []string{
-		"-y", // Overwrite output file
-	}
-
-	// Add input files
-	for _, path := range inputPaths {
-		args = append(args, "-i", path)
-	}
-
-	args = append(args,
-		"-filter_complex", filterComplex,
-		"-map", "[outv]",
-		"-c:v", "libx264",
-		"-pix_fmt", "yuv420p",
-		"-r", "30",
+	// FFmpeg: video + audio → финальный MP4
+	// -shortest обрезает по более короткому треку
+	cmd := exec.Command("ffmpeg", "-y",
+		"-i", videoPath,
+		"-i", audioPath,
+		"-c:v", "copy",
+		"-c:a", "libmp3lame", // AAC отключён в VSCode Electron; MP3 работает
+		"-b:a", "128k",
+		"-ar", "44100",
+		"-shortest",
+		"-movflags", "+faststart",
 		outputPath,
 	)
 
-	cmd := exec.Command("ffmpeg", args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("FFmpeg merge: %w\n%s", err, stderr.String())
+	}
 
-	return cmd.Run()
+	return nil
 }
 
-// combineAllSegments combines video and audio segments
-func (s *VideoService) combineAllSegments(segmentFiles []string, outputPath string) error {
-	// This is a simplified version - real implementation would properly sync audio
-	// For now, just concatenate all files as video
-	return s.combineVideos(segmentFiles, outputPath)
-}
-
-// GetVideoDuration returns the duration of a video file in milliseconds
-func (s *VideoService) GetVideoDuration(videoPath string) (int, error) {
+// GetDuration возвращает длительность видео в секундах через ffprobe
+func (s *VideoService) GetDuration(videoPath string) (float64, error) {
 	cmd := exec.Command("ffprobe",
 		"-v", "error",
 		"-show_entries", "format=duration",
-		"-of", "json",
-		videoPath)
+		"-of", "csv=p=0",
+		videoPath,
+	)
 
-	output, err := cmd.CombinedOutput()
+	out, err := cmd.Output()
 	if err != nil {
-		return 0, fmt.Errorf("ffprobe failed: %w", err)
+		return 0, fmt.Errorf("ffprobe: %w", err)
 	}
 
-	var result struct {
-		Format struct {
-			Duration float64 `json:"duration"`
-		} `json:"format"`
+	var dur float64
+	if _, err := fmt.Sscanf(string(out), "%f", &dur); err != nil {
+		return 0, fmt.Errorf("парсинг длительности: %w", err)
 	}
-
-	if err := json.Unmarshal(output, &result); err != nil {
-		return 0, fmt.Errorf("failed to parse ffprobe output: %w", err)
-	}
-
-	return int(result.Format.Duration * 1000), nil
+	return dur, nil
 }
 
-// GetVideoSize returns the size of a video file in bytes
-func (s *VideoService) GetVideoSize(videoPath string) (int64, error) {
-	info, err := os.Stat(videoPath)
-	if err != nil {
-		return 0, err
+// WaitForPuppeteer ожидает готовности Puppeteer сервиса
+func (s *VideoService) WaitForPuppeteer(maxWait time.Duration) error {
+	deadline := time.Now().Add(maxWait)
+	for time.Now().Before(deadline) {
+		resp, err := s.client.Get(s.cfg.PuppeteerURL + "/health")
+		if err == nil && resp.StatusCode == http.StatusOK {
+			resp.Body.Close()
+			return nil
+		}
+		time.Sleep(2 * time.Second)
 	}
-	return info.Size(), nil
+	return fmt.Errorf("Puppeteer сервис недоступен через %s", maxWait)
 }

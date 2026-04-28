@@ -1,177 +1,249 @@
 package services
 
 import (
+	"crypto/tls"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strings"
+	"sync"
 	"time"
 
-	"github.com/aka/semarang/pkg/state"
+	"github.com/google/uuid"
+
+	"go-secrets-pipeline/pkg/config"
 )
 
-// TTSService handles interactions with Yandex SpeechKit
+// ttsPhonetics — English Go-terms → Russian phonetics with stress marks.
+// Longer/plural forms come first to avoid partial replacements.
+var ttsPhonetics = func() []struct {
+	re *regexp.Regexp
+	to string
+} {
+	terms := [][2]string{
+		{"goroutines", "горут+ины"},
+		{"goroutine", "горут+ина"},
+		{"mutexes", "мь+ютексы"},
+		{"mutex", "мь+ютекс"},
+		{"interfaces", "интерф+ейсы"},
+		{"interface", "интерф+ейс"},
+		{"channels", "к+эналы"},
+		{"channel", "к+энал"},
+		{"slices", "сл+айсы"},
+		{"slice", "сл+айс"},
+		{"structs", "стр+укты"},
+		{"struct", "стр+укт"},
+		{"pointers", "п+оинтеры"},
+		{"pointer", "п+оинтер"},
+		{"deadlock", "д+едлок"},
+		{"benchmark", "б+енчмарк"},
+		{"runtime", "р+антайм"},
+		{"timeout", "т+аймаут"},
+		{"deploy", "депл+ой"},
+		{"defer", "диф+ёр"},
+		{"panic", "п+эник"},
+		{"nil", "н+ил"},
+		{"vegeta", "вег+ета"},
+		{"wrk", "ворк"},
+		{"pprof", "пи-проф"},
+		{"slog", "эс-лог"},
+		{"grpc", "джи-эр-пи-си"},
+		{"https", "эйч-ти-ти-пи-эс"},
+		{"http", "эйч-ти-ти-пи"},
+		{"json", "джей-сон"},
+		{"sql", "эс-кю-эл"},
+		{"api", "эй-пи-ай"},
+		{"url", "ю-эр-эл"},
+		{"golang", "гол+анг"},
+	}
+	var out []struct {
+		re *regexp.Regexp
+		to string
+	}
+	for _, t := range terms {
+		out = append(out, struct {
+			re *regexp.Regexp
+			to string
+		}{regexp.MustCompile(`(?i)\b` + regexp.QuoteMeta(t[0]) + `\b`), t[1]})
+	}
+	return out
+}()
+
+const (
+	saluteSpeechOAuthURL = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth"
+	saluteSpeechSynthURL = "https://smartspeech.sber.ru/rest/v1/text:synthesize"
+)
+
 type TTSService struct {
-	apiKey     string
-	folderID   string
-	baseURL    string
-	voice      string
-	lang       string
-	httpClient *http.Client
-	usageMgr   *state.TTSUsageManager
-	maxChars   int
+	cfg    *config.Config
+	mu     sync.Mutex
+	token  string
+	expiry time.Time
+	client *http.Client
 }
 
-// NewTTSService creates a new TTSService
-func NewTTSService(apiKey, folderID, baseURL, voice, lang string, usageMgr *state.TTSUsageManager, maxChars int) *TTSService {
+type oauthResponse struct {
+	AccessToken string `json:"access_token"`
+	ExpiresAt   int64  `json:"expires_at"` // milliseconds Unix
+}
+
+func NewTTSService(cfg *config.Config) *TTSService {
+	transport := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec // Sber uses Russian CA not in standard pool
+	}
 	return &TTSService{
-		apiKey:   apiKey,
-		folderID: folderID,
-		baseURL:  baseURL,
-		voice:    voice,
-		lang:     lang,
-		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
-		},
-		usageMgr: usageMgr,
-		maxChars: maxChars,
+		cfg:    cfg,
+		client: &http.Client{Timeout: 30 * time.Second, Transport: transport},
 	}
 }
 
-// Synthesize converts text to speech and saves to file
-// Returns the duration in milliseconds
-func (s *TTSService) Synthesize(text, outputPath string) (int, error) {
-	// Check text length
-	if len(text) > s.maxChars {
-		return 0, fmt.Errorf("text exceeds max length: %d chars (max: %d)", len(text), s.maxChars)
+// langToBCP47 maps our short lang codes to BCP-47 tags supported by SaluteSpeech.
+// Supported: ru-RU, en-US, es-ES. Unsupported (cn, hi, ja) fall back to ru-RU.
+func langToBCP47(lang string) string {
+	switch lang {
+	case "en":
+		return "en-US"
+	case "es":
+		return "es-ES"
+	default:
+		return "ru-RU"
+	}
+}
+
+// toSSML оборачивает текст в SSML <speak>.
+// Если текст уже содержит <speak>...</speak> (сгенерирован LLM) — очищает и возвращает.
+// Иначе применяет фонетические замены (только для ru) и оборачивает с тегом <lang>.
+func (s *TTSService) toSSML(text string) string {
+	trimmed := strings.TrimSpace(text)
+	if strings.HasPrefix(trimmed, "<speak>") && strings.HasSuffix(trimmed, "</speak>") {
+		return trimmed
 	}
 
-	// Check quota
-	if s.usageMgr.IsQuotaExceeded() {
-		return 0, fmt.Errorf("TTS quota exceeded: %d/%d chars used",
-			s.usageMgr.GetCharsUsed(), s.maxChars)
+	lang := s.cfg.Lang
+	if lang == "" {
+		lang = "ru"
 	}
 
-	// Build request URL
+	// Фонетические замены только для русского (fallback path)
+	if lang == "ru" {
+		for _, p := range ttsPhonetics {
+			text = p.re.ReplaceAllString(text, p.to)
+		}
+	}
+
+	text = strings.ReplaceAll(text, "&", "&amp;")
+	text = strings.ReplaceAll(text, "<", "&lt;")
+	text = strings.ReplaceAll(text, ">", "&gt;")
+
+	if lang != "ru" {
+		bcp47 := langToBCP47(lang)
+		return fmt.Sprintf(`<speak><lang xml:lang="%s">%s</lang></speak>`, bcp47, text)
+	}
+	return "<speak>" + text + "</speak>"
+}
+
+// Synthesize генерирует WAV файл из текста и сохраняет его по outputPath
+func (s *TTSService) Synthesize(text, outputPath string) error {
+	token, err := s.getToken()
+	if err != nil {
+		return fmt.Errorf("SaluteSpeech auth: %w", err)
+	}
+
+	// Собираем URL с параметрами
 	params := url.Values{}
-	params.Set("text", text)
-	params.Set("voice", s.voice)
-	params.Set("lang", s.lang)
-	params.Set("format", "mp3")
+	params.Set("voice", s.cfg.SaluteSpeechVoice)
+	params.Set("format", "wav16")
+	params.Set("sample_rate_hertz", "24000")
+	synthURL := saluteSpeechSynthURL + "?" + params.Encode()
 
-	reqURL := s.baseURL + "?" + params.Encode()
-
-	// Create request
-	req, err := http.NewRequest("POST", reqURL, nil)
+	ssml := s.toSSML(text)
+	req, err := http.NewRequest("POST", synthURL, strings.NewReader(ssml))
 	if err != nil {
-		return 0, fmt.Errorf("failed to create request: %w", err)
+		return err
 	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/ssml")
+	req.Header.Set("X-Operation-ID", uuid.New().String())
+	req.Header.Set("X-Request-ID", uuid.New().String())
 
-	req.Header.Set("Authorization", "Api-Key "+s.apiKey)
-
-	// Send request
-	resp, err := s.httpClient.Do(req)
+	resp, err := s.client.Do(req)
 	if err != nil {
-		return 0, fmt.Errorf("failed to send request: %w", err)
+		return fmt.Errorf("SaluteSpeech синтез: %w", err)
 	}
 	defer resp.Body.Close()
 
-	// Check response
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return 0, fmt.Errorf("TTS API returned status %d: %s", resp.StatusCode, string(body))
+		return fmt.Errorf("SaluteSpeech ошибка %d: %s", resp.StatusCode, string(body))
 	}
 
-	// Create output directory
 	if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
-		return 0, fmt.Errorf("failed to create output directory: %w", err)
+		return err
 	}
 
-	// Save audio file
-	file, err := os.Create(outputPath)
+	f, err := os.Create(outputPath)
 	if err != nil {
-		return 0, fmt.Errorf("failed to create output file: %w", err)
+		return err
 	}
-	defer file.Close()
+	defer f.Close()
 
-	if _, err := io.Copy(file, resp.Body); err != nil {
-		return 0, fmt.Errorf("failed to save audio: %w", err)
+	_, err = io.Copy(f, resp.Body)
+	return err
+}
+
+// getToken возвращает валидный OAuth2 токен (с кэшем на 29 минут)
+func (s *TTSService) getToken() (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.token != "" && time.Now().Before(s.expiry) {
+		return s.token, nil
 	}
 
-	// Get audio duration using ffprobe
-	durationMs, err := s.getAudioDuration(outputPath)
+	creds := base64.StdEncoding.EncodeToString(
+		[]byte(s.cfg.SaluteSpeechClientID + ":" + s.cfg.SaluteSpeechClientSecret),
+	)
+
+	form := url.Values{}
+	form.Set("scope", s.cfg.SaluteSpeechScope)
+
+	req, err := http.NewRequest("POST", saluteSpeechOAuthURL, strings.NewReader(form.Encode()))
 	if err != nil {
-		return 0, fmt.Errorf("failed to get audio duration: %w", err)
+		return "", err
 	}
+	req.Header.Set("Authorization", "Basic "+creds)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("RqUID", uuid.New().String())
 
-	// Update usage
-	if err := s.usageMgr.AddUsage(len(text)); err != nil {
-		return 0, fmt.Errorf("failed to update TTS usage: %w", err)
-	}
-
-	return durationMs, nil
-}
-
-// getAudioDuration gets the duration of an audio file using ffprobe
-func (s *TTSService) getAudioDuration(audioPath string) (int, error) {
-	// Try ffprobe first
-	cmd := exec.Command("ffprobe",
-		"-v", "error",
-		"-show_entries", "format=duration",
-		"-of", "json",
-		audioPath)
-
-	output, err := cmd.CombinedOutput()
+	resp, err := s.client.Do(req)
 	if err != nil {
-		// Fallback to estimation (8 chars/sec for Russian)
-		return s.estimateDuration(audioPath), nil
+		return "", fmt.Errorf("OAuth2 запрос: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("OAuth2 ошибка %d: %s", resp.StatusCode, string(body))
 	}
 
-	var result struct {
-		Format struct {
-			Duration float64 `json:"duration"`
-		} `json:"format"`
+	var oauthResp oauthResponse
+	if err := json.NewDecoder(resp.Body).Decode(&oauthResp); err != nil {
+		return "", fmt.Errorf("парсинг OAuth2 ответа: %w", err)
 	}
 
-	if err := json.Unmarshal(output, &result); err != nil {
-		return s.estimateDuration(audioPath), nil
+	s.token = oauthResp.AccessToken
+	// expires_at в миллисекундах, кэшируем на 29 минут
+	if oauthResp.ExpiresAt > 0 {
+		s.expiry = time.UnixMilli(oauthResp.ExpiresAt).Add(-1 * time.Minute)
+	} else {
+		s.expiry = time.Now().Add(29 * time.Minute)
 	}
 
-	return int(result.Format.Duration * 1000), nil
-}
-
-// estimateDuration estimates duration based on file size
-// Fallback when ffprobe is not available
-func (s *TTSService) estimateDuration(audioPath string) int {
-	// Rough estimation: 1KB ≈ 0.1 seconds at 128kbps MP3
-	info, err := os.Stat(audioPath)
-	if err != nil {
-		return 5000 // 5 seconds default
-	}
-
-	// Duration in seconds ≈ file_size / 12800 (bits per second)
-	durationSec := float64(info.Size()) / 12800.0
-	return int(durationSec * 1000)
-}
-
-// EstimateDurationFromText estimates speech duration from text
-func (s *TTSService) EstimateDurationFromText(text string, charsPerSec float64) int {
-	durationSec := float64(len(text)) / charsPerSec
-	return int(durationSec * 1000) // milliseconds
-}
-
-// GetQuotaInfo returns current quota information
-func (s *TTSService) GetQuotaInfo() (used, remaining, total int) {
-	return s.usageMgr.GetCharsUsed(),
-		s.usageMgr.GetCharsRemaining(),
-		s.maxChars
-}
-
-// GetCallsToday returns the number of TTS calls today
-func (s *TTSService) GetCallsToday() int {
-	return s.usageMgr.GetCallsToday()
+	return s.token, nil
 }

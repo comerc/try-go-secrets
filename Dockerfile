@@ -1,50 +1,21 @@
-FROM golang:1.21-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
-# Install build dependencies
-RUN apk add --no-cache git
+RUN apk add --no-cache gcc musl-dev
 
-# Set working directory
 WORKDIR /app
-
-# Copy go mod files
 COPY go.mod go.sum ./
 RUN go mod download
-
-# Copy source code
 COPY . .
+RUN go build -o /go-secrets-pipeline ./cmd
 
-# Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -o semarang ./cmd/main.go
+# Runtime
+FROM alpine:3.23
+RUN apk add --no-cache ffmpeg ca-certificates tzdata
 
-# Runtime stage
-FROM alpine:3.18
-
-# Install runtime dependencies
-RUN apk add --no-cache \
-    ffmpeg \
-    ffprobe \
-    ca-certificates
-
-# Create app user
-RUN addgroup -g 1000 appuser && \
-    adduser -D -u 1000 -G appuser appuser
-
-# Set working directory
 WORKDIR /app
+COPY --from=builder /go-secrets-pipeline .
+COPY .env.example .env.example
 
-# Copy binary from builder
-COPY --from=builder /app/semarang .
+RUN mkdir -p output/scripts output/audio output/videos output/logs state
 
-# Create directories
-RUN mkdir -p /app/raw /app/output /app/state && \
-    chown -R appuser:appuser /app
-
-# Switch to non-root user
-USER appuser
-
-# Set environment variables
-ENV RAW_DIR=/app/raw
-ENV OUTPUT_DIR=/app/output
-ENV STATE_DIR=/app/state
-
-CMD ["./semarang"]
+ENTRYPOINT ["./go-secrets-pipeline"]

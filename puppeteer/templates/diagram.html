@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Go Secret Diagram</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0d1117;
+      width: 1080px;
+      height: 1920px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #c9d1d9;
+      font-family: 'Fira Code', monospace;
+    }
+    .diagram-container {
+      width: 960px;
+      padding: 40px;
+      background: #161b22;
+      border-radius: 16px;
+      border: 1px solid #30363d;
+    }
+    .mermaid { filter: invert(0); }
+  </style>
+</head>
+<body>
+  <div class="diagram-container">
+    <div class="mermaid" id="diagram-content">{{DIAGRAM}}</div>
+  </div>
+  <script>
+    mermaid.initialize({ startOnLoad: true, theme: 'dark' });
+  </script>
+</body>
+</html>

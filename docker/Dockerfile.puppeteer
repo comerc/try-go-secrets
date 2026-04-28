@@ -1,0 +1,21 @@
+FROM node:20-alpine
+
+RUN apk add --no-cache \
+    chromium \
+    ffmpeg \
+    nss \
+    freetype \
+    harfbuzz \
+    ca-certificates
+
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+
+WORKDIR /app
+COPY puppeteer/package*.json ./
+RUN npm ci --omit=dev
+COPY puppeteer/ .
+COPY static/ ../static/
+
+EXPOSE 3000
+CMD ["node", "server.js"]

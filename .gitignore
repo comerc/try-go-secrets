@@ -1,35 +1,4 @@
-# Environment
 .env
-
-# Output files
 output/
-
-# Logs
-*.log
-
-# OS
-.DS_Store
-Thumbs.db
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# Go
-*.test
-*.out
-go.work
-
-# Node
-node_modules/
-npm-debug.log
-yarn-error.log
-
-# Puppeteer
-.puppeteer/
-
-# Temporary files
-*.tmp
-*.temp
+puppeteer/node_modules/
+go-secrets-pipeline

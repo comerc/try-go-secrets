@@ -1,170 +1,83 @@
 package services
 
 import (
-	"fmt"
 	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 
-	"github.com/aka/semarang/pkg/models"
+	"go-secrets-pipeline/pkg/models"
 )
 
-// ContentParser handles parsing markdown files containing Go secrets
-type ContentParser struct {
-	goCodeRegex     *regexp.Regexp
-	mermaidRegex    *regexp.Regexp
-	oldContentRegex *regexp.Regexp
-	exampleRegex    *regexp.Regexp
-	diagramRegex    *regexp.Regexp
-}
+var (
+	reCodeBlock = regexp.MustCompile("(?s)```(\\w*)\\n(.*?)```")
+	reOldBlock  = regexp.MustCompile("(?s)```old\\n(.*?)```")
+)
 
-// NewContentParser creates a new ContentParser
-func NewContentParser() (*ContentParser, error) {
-	goCodeRegex, err := regexp.Compile("(?s)```go\\n(.*?)\\n```")
+// ParseMarkdown разбирает markdown-файл с секретом Go
+func ParseMarkdown(filePath string) (*models.RawContent, error) {
+	data, err := os.ReadFile(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to compile go code regex: %w", err)
+		return nil, err
 	}
 
-	mermaidRegex, err := regexp.Compile("(?s)```mermaid\\n(.*?)\\n```")
-	if err != nil {
-		return nil, fmt.Errorf("failed to compile mermaid regex: %w", err)
+	raw := string(data)
+	content := &models.RawContent{
+		FilePath: filePath,
+		FileNum:  extractFileNum(filePath),
+		Title:    extractTitle(raw, filePath),
 	}
 
-	oldContentRegex, err := regexp.Compile("(?s)```old\\n(.*?)\\n```")
-	if err != nil {
-		return nil, fmt.Errorf("failed to compile old content regex: %w", err)
-	}
-
-	return &ContentParser{
-		goCodeRegex:     goCodeRegex,
-		mermaidRegex:    mermaidRegex,
-		oldContentRegex: oldContentRegex,
-		exampleRegex:    regexp.MustCompile(`(?i)пример:`),
-		diagramRegex:    regexp.MustCompile(`(?i)диаграмма:`),
-	}, nil
-}
-
-// Parse parses a markdown file and returns ParsedContent
-func (cp *ContentParser) Parse(filePath string) (*models.ParsedContent, error) {
-	content, err := os.ReadFile(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read file %s: %w", filePath, err)
-	}
-
-	text := string(content)
-
-	// Extract title from filename
-	_, filename := filepath.Split(filePath)
-	title := strings.TrimSuffix(filename, ".md")
-
-	// Extract code blocks
-	codeBlocks := cp.extractCodeBlocks(text)
-
-	// Extract diagrams
-	diagrams := cp.extractDiagrams(text)
-
-	// Extract legacy content
-	legacy := cp.extractLegacy(text)
-
-	// Extract explanation (text outside code blocks, diagrams, and legacy)
-	explanation := cp.extractExplanation(text)
-
-	return &models.ParsedContent{
-		FilePath:    filePath,
-		Title:       title,
-		Explanation: explanation,
-		CodeBlocks:  codeBlocks,
-		Diagrams:    diagrams,
-		Legacy:      legacy,
-	}, nil
-}
-
-// extractCodeBlocks extracts all Go code blocks from the text
-func (cp *ContentParser) extractCodeBlocks(text string) []models.CodeBlock {
-	matches := cp.goCodeRegex.FindAllStringSubmatch(text, -1)
-	blocks := make([]models.CodeBlock, 0, len(matches))
-
-	for _, match := range matches {
-		if len(match) > 1 {
-			blocks = append(blocks, models.CodeBlock{
-				Content:  strings.TrimSpace(match[1]),
-				Language: "go",
+	// Извлекаем блоки кода (кроме old)
+	for _, m := range reCodeBlock.FindAllStringSubmatch(raw, -1) {
+		lang := strings.TrimSpace(m[1])
+		code := strings.TrimSpace(m[2])
+		if lang == "old" {
+			content.OldBlocks = append(content.OldBlocks, code)
+		} else {
+			content.CodeBlocks = append(content.CodeBlocks, models.CodeBlock{
+				Lang: lang,
+				Code: code,
 			})
 		}
 	}
 
-	return blocks
+	// Основной текст: убираем все блоки кода
+	explanation := reCodeBlock.ReplaceAllString(raw, "")
+	explanation = strings.TrimSpace(explanation)
+	content.Explanation = explanation
+
+	return content, nil
 }
 
-// extractDiagrams extracts all mermaid diagrams from the text
-func (cp *ContentParser) extractDiagrams(text string) []models.Diagram {
-	matches := cp.mermaidRegex.FindAllStringSubmatch(text, -1)
-	diagrams := make([]models.Diagram, 0, len(matches))
-
-	for _, match := range matches {
-		if len(match) > 1 {
-			diagrams = append(diagrams, models.Diagram{
-				Content: strings.TrimSpace(match[1]),
-				Type:    "mermaid",
-			})
-		}
+// extractFileNum извлекает номер из имени файла (*__line-NNN.md или *-line-NNN.md)
+func extractFileNum(path string) int {
+	re := regexp.MustCompile(`(?:__|-)line-(\d+)`)
+	parts := strings.Split(path, "/")
+	name := parts[len(parts)-1]
+	m := re.FindStringSubmatch(name)
+	if m == nil {
+		return 0
 	}
-
-	return diagrams
-}
-
-// extractLegacy extracts the legacy content from the text
-func (cp *ContentParser) extractLegacy(text string) *models.Legacy {
-	match := cp.oldContentRegex.FindStringSubmatch(text)
-	if match != nil && len(match) > 1 {
-		return &models.Legacy{
-			Content: strings.TrimSpace(match[1]),
-		}
+	n := 0
+	for _, ch := range m[1] {
+		n = n*10 + int(ch-'0')
 	}
-	return nil
+	return n
 }
 
-// extractExplanation extracts the main explanation text, excluding code blocks, diagrams, and legacy content
-func (cp *ContentParser) extractExplanation(text string) string {
-	// Remove code blocks
-	text = cp.goCodeRegex.ReplaceAllString(text, "")
-
-	// Remove mermaid diagrams
-	text = cp.mermaidRegex.ReplaceAllString(text, "")
-
-	// Remove legacy content
-	text = cp.oldContentRegex.ReplaceAllString(text, "")
-
-	// Remove labels
-	text = cp.exampleRegex.ReplaceAllString(text, "")
-	text = cp.diagramRegex.ReplaceAllString(text, "")
-
-	// Clean up whitespace
-	lines := strings.Split(text, "\n")
-	cleanLines := make([]string, 0, len(lines))
-
-	for _, line := range lines {
+// extractTitle берёт первую непустую строку как заголовок
+func extractTitle(raw, filePath string) string {
+	for _, line := range strings.Split(raw, "\n") {
+		line = strings.TrimSpace(line)
+		line = strings.TrimPrefix(line, "#")
 		line = strings.TrimSpace(line)
 		if line != "" {
-			cleanLines = append(cleanLines, line)
+			return line
 		}
 	}
-
-	return strings.Join(cleanLines, "\n")
-}
-
-// ParseNumberFromFilename extracts the line number from a filename
-// Example: "Go_Secret__line-043.md" -> 43
-func ParseNumberFromFilename(filename string) int {
-	re := regexp.MustCompile(`line-(\d+)\.md$`)
-	match := re.FindStringSubmatch(filename)
-	if match != nil && len(match) > 1 {
-		var num int
-		_, err := fmt.Sscanf(match[1], "%d", &num)
-		if err == nil {
-			return num
-		}
-	}
-	return 0
+	// fallback: имя файла
+	parts := strings.Split(filePath, "/")
+	name := parts[len(parts)-1]
+	name = strings.TrimSuffix(name, ".md")
+	return name
 }

@@ -1,4 +1,1174 @@
 {
-  "processed_files": [],
-  "last_updated": ""
+  "entries": [
+    {
+      "file_num": 181,
+      "slug": "channel-comparison-go",
+      "video_path": "output/videos/2026-03-10__181.mp4",
+      "date": "2026-03-10"
+    },
+    {
+      "file_num": 281,
+      "slug": "accept-interfaces-return-structs",
+      "video_path": "output/videos/2026-03-10__281.mp4",
+      "date": "2026-03-10"
+    },
+    {
+      "file_num": 30,
+      "slug": "url-parse-split-host-port",
+      "video_path": "output/videos/2026-03-10__030.mp4",
+      "date": "2026-03-10"
+    },
+    {
+      "file_num": 166,
+      "slug": "select-random-choice",
+      "video_path": "output/videos/2026-03-10__166.mp4",
+      "date": "2026-03-10"
+    },
+    {
+      "file_num": 111,
+      "slug": "golangci-lint-secret",
+      "video_path": "output/videos/2026-03-10__111.mp4",
+      "date": "2026-03-10"
+    },
+    {
+      "file_num": 195,
+      "slug": "go-string-clone-memory-leak",
+      "video_path": "output/videos/2026-03-10__195.mp4",
+      "date": "2026-03-10"
+    },
+    {
+      "file_num": 95,
+      "slug": "unsafe-slice-internal-array",
+      "video_path": "output/videos/2026-03-10__095.mp4",
+      "date": "2026-03-10"
+    },
+    {
+      "file_num": 90,
+      "slug": "go-sort-algorithms-secret",
+      "video_path": "output/videos/2026-03-11__090.mp4",
+      "date": "2026-03-11"
+    },
+    {
+      "file_num": 21,
+      "slug": "defer-pointer-capture",
+      "video_path": "output/videos/2026-03-11__021.mp4",
+      "date": "2026-03-11"
+    },
+    {
+      "file_num": 8,
+      "slug": "go-range-string-rune-index",
+      "video_path": "output/videos/2026-03-11__008.mp4",
+      "date": "2026-03-11"
+    },
+    {
+      "file_num": 226,
+      "slug": "sql-prepared-statements",
+      "video_path": "output/videos/2026-03-11__226.mp4",
+      "date": "2026-03-11"
+    },
+    {
+      "file_num": 222,
+      "slug": "go-time-monotonic-clock",
+      "video_path": "output/videos/2026-03-11__222.mp4",
+      "date": "2026-03-11"
+    },
+    {
+      "file_num": 229,
+      "slug": "http-response-body-close",
+      "video_path": "output/videos/2026-03-11__229.mp4",
+      "date": "2026-03-11"
+    },
+    {
+      "file_num": 88,
+      "slug": "go-concurrency-patterns",
+      "video_path": "output/videos/2026-03-11__088.mp4",
+      "date": "2026-03-11"
+    },
+    {
+      "file_num": 208,
+      "slug": "type-conversion-data-race",
+      "video_path": "output/videos/2026-03-11__208.mp4",
+      "date": "2026-03-11"
+    },
+    {
+      "file_num": 18,
+      "slug": "type-assertion-go",
+      "video_path": "output/videos/2026-03-11__018.mp4",
+      "date": "2026-03-11"
+    },
+    {
+      "file_num": 163,
+      "slug": "sync-cond-broadcast",
+      "video_path": "output/videos/2026-03-11__163.mp4",
+      "date": "2026-03-11"
+    },
+    {
+      "file_num": 63,
+      "slug": "go-math-pow-secret",
+      "video_path": "output/videos/2026-03-11__063.mp4",
+      "date": "2026-03-11"
+    },
+    {
+      "file_num": 177,
+      "slug": "go-slice-memory-pitfall",
+      "video_path": "output/videos/2026-03-11__177.mp4",
+      "date": "2026-03-11"
+    },
+    {
+      "file_num": 135,
+      "slug": "typed-nil-interface-trap",
+      "video_path": "output/videos/2026-03-11__135.mp4",
+      "date": "2026-03-11"
+    },
+    {
+      "file_num": 125,
+      "slug": "go-iota-secret",
+      "video_path": "output/videos/2026-03-11__125.mp4",
+      "date": "2026-03-11"
+    },
+    {
+      "file_num": 19,
+      "slug": "type-assertion-secret",
+      "video_path": "output/videos/2026-03-11__019.mp4",
+      "date": "2026-03-11"
+    },
+    {
+      "file_num": 53,
+      "slug": "cleanenv-godotenv-config",
+      "video_path": "output/videos/2026-03-11__053.mp4",
+      "date": "2026-03-11"
+    },
+    {
+      "file_num": 118,
+      "slug": "generics-tilde-approximation",
+      "video_path": "output/videos/2026-03-11__118.mp4",
+      "date": "2026-03-11"
+    },
+    {
+      "file_num": 124,
+      "slug": "go-utf8-rune-secret",
+      "video_path": "output/videos/2026-03-11__124.mp4",
+      "date": "2026-03-11"
+    },
+    {
+      "file_num": 202,
+      "slug": "defer-named-return-error",
+      "video_path": "output/videos/2026-03-11__202.mp4",
+      "date": "2026-03-11"
+    },
+    {
+      "file_num": 225,
+      "slug": "sql-open-lazy-connection",
+      "video_path": "output/videos/2026-03-11__225.mp4",
+      "date": "2026-03-11"
+    },
+    {
+      "file_num": 103,
+      "slug": "go-channel-range-close",
+      "video_path": "output/videos/2026-03-11__103.mp4",
+      "date": "2026-03-11"
+    },
+    {
+      "file_num": 168,
+      "slug": "accept-interfaces-return-concrete",
+      "video_path": "output/videos/2026-03-11__168.mp4",
+      "date": "2026-03-11"
+    },
+    {
+      "file_num": 29,
+      "slug": "time-add-negative-duration",
+      "video_path": "output/videos/2026-03-11__029.mp4",
+      "date": "2026-03-11"
+    },
+    {
+      "file_num": 54,
+      "slug": "must-prefix-panic-convention",
+      "video_path": "output/videos/2026-03-11__054.mp4",
+      "date": "2026-03-11"
+    },
+    {
+      "file_num": 273,
+      "slug": "pipeline-vs-builder",
+      "video_path": "output/videos/2026-03-11__273.mp4",
+      "date": "2026-03-11"
+    },
+    {
+      "file_num": 82,
+      "slug": "go-string-interpolation-secret",
+      "video_path": "output/videos/2026-03-11__082.mp4",
+      "date": "2026-03-11"
+    },
+    {
+      "file_num": 60,
+      "slug": "dependency-injection-io-writer",
+      "video_path": "output/videos/2026-03-11__060.mp4",
+      "date": "2026-03-11"
+    },
+    {
+      "file_num": 15,
+      "slug": "go-ticker-channel-loop",
+      "video_path": "output/videos/2026-03-11__015.mp4",
+      "date": "2026-03-11"
+    },
+    {
+      "file_num": 46,
+      "slug": "go-playground-validator-secret",
+      "video_path": "output/videos/2026-03-11__046.mp4",
+      "date": "2026-03-11"
+    },
+    {
+      "file_num": 176,
+      "slug": "go-slice-append-side-effect",
+      "video_path": "output/videos/2026-03-11__176.mp4",
+      "date": "2026-03-11"
+    },
+    {
+      "file_num": 251,
+      "slug": "go-escape-analysis-gcflags",
+      "video_path": "output/videos/2026-03-11__251.mp4",
+      "date": "2026-03-11"
+    },
+    {
+      "file_num": 247,
+      "slug": "ilp-data-hazard-go",
+      "video_path": "output/videos/2026-03-11__247.mp4",
+      "date": "2026-03-11"
+    },
+    {
+      "file_num": 211,
+      "slug": "go-context-key-best-practice",
+      "video_path": "output/videos/2026-03-11__211.mp4",
+      "date": "2026-03-11"
+    },
+    {
+      "file_num": 130,
+      "slug": "nil-receiver-method-call",
+      "video_path": "output/videos/2026-03-11__130.mp4",
+      "date": "2026-03-11"
+    },
+    {
+      "file_num": 246,
+      "slug": "cpu-cache-false-sharing-go",
+      "video_path": "output/videos/2026-03-11__246.mp4",
+      "date": "2026-03-11"
+    },
+    {
+      "file_num": 26,
+      "slug": "regexp-mustcompile-secret",
+      "video_path": "output/videos/2026-03-11__026.mp4",
+      "date": "2026-03-11"
+    },
+    {
+      "file_num": 148,
+      "slug": "go-function-literal-secret",
+      "video_path": "output/videos/2026-03-12__148.mp4",
+      "date": "2026-03-12"
+    },
+    {
+      "file_num": 10,
+      "slug": "utf8-runecount-vs-rune-slice",
+      "video_path": "output/videos/2026-03-12__010.mp4",
+      "date": "2026-03-12"
+    },
+    {
+      "file_num": 153,
+      "slug": "go-anonymous-structs",
+      "video_path": "output/videos/2026-03-12__153.mp4",
+      "date": "2026-03-12"
+    },
+    {
+      "file_num": 142,
+      "slug": "type-switch-nil-check",
+      "video_path": "output/videos/2026-03-12__142.mp4",
+      "date": "2026-03-12"
+    },
+    {
+      "file_num": 262,
+      "slug": "scheduler-vs-tracer-go",
+      "video_path": "output/videos/2026-03-12__262.mp4",
+      "date": "2026-03-12"
+    },
+    {
+      "file_num": 117,
+      "slug": "generics-vs-type-parameters",
+      "video_path": "output/videos/2026-03-12__117.mp4",
+      "date": "2026-03-12"
+    },
+    {
+      "file_num": 178,
+      "slug": "go-make-map-slice",
+      "video_path": "output/videos/2026-03-12__178.mp4",
+      "date": "2026-03-12"
+    },
+    {
+      "file_num": 199,
+      "slug": "go-error-wrapping-unwrap",
+      "video_path": "output/videos/2026-03-12__199.mp4",
+      "date": "2026-03-12"
+    },
+    {
+      "file_num": 42,
+      "slug": "colorful-slog-handler",
+      "video_path": "output/videos/2026-03-12__042.mp4",
+      "date": "2026-03-12"
+    },
+    {
+      "file_num": 224,
+      "slug": "json-unmarshal-float64-secret",
+      "video_path": "output/videos/2026-03-12__224.mp4",
+      "date": "2026-03-12"
+    },
+    {
+      "file_num": 102,
+      "slug": "go-slice-capacity-growth",
+      "video_path": "output/videos/2026-03-12__102.mp4",
+      "date": "2026-03-12"
+    },
+    {
+      "file_num": 236,
+      "slug": "go-test-shuffle-flag",
+      "video_path": "output/videos/2026-03-12__236.mp4",
+      "date": "2026-03-12"
+    },
+    {
+      "file_num": 197,
+      "slug": "go-io-reader-secret",
+      "video_path": "output/videos/2026-03-12__197.mp4",
+      "date": "2026-03-12"
+    },
+    {
+      "file_num": 159,
+      "slug": "go-install-gobin-secret",
+      "video_path": "output/videos/2026-03-12__159.mp4",
+      "date": "2026-03-12"
+    },
+    {
+      "file_num": 1,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 17,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 25,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 32,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 33,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 37,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 39,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 45,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 47,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 48,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 50,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 51,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 57,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 70,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 71,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 74,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 78,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 80,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 87,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 98,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 99,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 100,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 109,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 113,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 114,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 115,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 126,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 127,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 131,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 140,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 144,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 155,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 157,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 167,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 171,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 173,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 174,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 175,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 180,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 184,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 188,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 192,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 201,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 207,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 210,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 219,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 221,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 227,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 231,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 235,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 240,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 243,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 253,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 259,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 261,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 265,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 267,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 269,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 271,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 272,
+      "slug": "",
+      "video_path": "",
+      "date": ""
+    },
+    {
+      "file_num": 275,
+      "slug": "go-raw-strings-backtick",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 266,
+      "slug": "go-gctrace-debug",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 232,
+      "slug": "go-test-short-mode",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 276,
+      "slug": "compile-time-interface-check",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 146,
+      "slug": "context-cancel-tree",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 158,
+      "slug": "go-build-cache-secret",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 147,
+      "slug": "go-function-signature-contract",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 133,
+      "slug": "go-method-set-pointer-vs-value",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 139,
+      "slug": "io-writestring-secret",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 77,
+      "slug": "gherkingen-bdd-go",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 61,
+      "slug": "go-interface-no-func-keyword",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 97,
+      "slug": "go-concurrency-bugs-goroutine-leak",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 83,
+      "slug": "goroutine-leak-context-cancel",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 120,
+      "slug": "generic-slice-alias",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 186,
+      "slug": "map-mutation-during-range",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 189,
+      "slug": "go-labeled-continue-secret",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 101,
+      "slug": "slice-trim-keeps-capacity",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 35,
+      "slug": "fuzzing-tests-go",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 56,
+      "slug": "pgxpool-connection-pool",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 112,
+      "slug": "uber-go-config-dynamic-reload",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 72,
+      "slug": "go-dependency-inversion-interface",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 105,
+      "slug": "go-test-package-naming",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 122,
+      "slug": "go-generics-approximation-element",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 268,
+      "slug": "go-clean-modcache",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 250,
+      "slug": "go-escape-analysis-stack-vs-heap",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 5,
+      "slug": "go-three-index-slice-capacity",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 94,
+      "slug": "go-slices-package-generic",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 22,
+      "slug": "defer-captures-variable-not-value",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 119,
+      "slug": "strconv-itoa-atoi-secret",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 217,
+      "slug": "zero-size-struct-vs-empty-interface",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 233,
+      "slug": "go-race-detection-exclusion",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 200,
+      "slug": "go-sentinel-errors",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 59,
+      "slug": "uber-fx-dependency-injection",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 165,
+      "slug": "go-channel-range-vs-select-ok",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 38,
+      "slug": "golang-migrate-db-migrations",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 249,
+      "slug": "go-struct-memory-alignment",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 34,
+      "slug": "go-test-run-regex-filter",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 116,
+      "slug": "go-slices-clip-memory",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 252,
+      "slug": "go-noinline-directive",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 86,
+      "slug": "go-break-select-loop-trap",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 136,
+      "slug": "interface-comparison-panic",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 2,
+      "slug": "go-if-init-secret",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 194,
+      "slug": "slice-vs-array-comparison",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 13,
+      "slug": "go-channel-direction-secret",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 75,
+      "slug": "grouped-type-declarations",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 215,
+      "slug": "go-closures-state",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 4,
+      "slug": "slice-shared-memory-secret",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 164,
+      "slug": "go-channel-read-ok-semantics",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 254,
+      "slug": "go-block-profiler-secret",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 89,
+      "slug": "go-pipe-functional-style",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 187,
+      "slug": "break-vs-goto-in-go",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 204,
+      "slug": "go-channels-vs-mutexes",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 239,
+      "slug": "benchmark-timer-controls",
+      "video_path": "",
+      "date": "2026-03-14"
+    },
+    {
+      "file_num": 245,
+      "slug": "cpu-cache-stride-secret",
+      "video_path": "",
+      "date": "2026-03-15"
+    },
+    {
+      "file_num": 69,
+      "slug": "clean-main-function",
+      "video_path": "",
+      "date": "2026-03-15"
+    },
+    {
+      "file_num": 214,
+      "slug": "signal-notify-context",
+      "video_path": "",
+      "date": "2026-03-15"
+    },
+    {
+      "file_num": 106,
+      "slug": "io-discard-black-hole",
+      "video_path": "",
+      "date": "2026-03-15"
+    },
+    {
+      "file_num": 121,
+      "slug": "why-go-square-brackets-generics",
+      "video_path": "",
+      "date": "2026-03-15"
+    },
+    {
+      "file_num": 49,
+      "slug": "graceful-shutdown-go",
+      "video_path": "",
+      "date": "2026-03-15"
+    },
+    {
+      "file_num": 220,
+      "slug": "time-after-memory-leak",
+      "video_path": "",
+      "date": "2026-03-15"
+    },
+    {
+      "file_num": 216,
+      "slug": "go-loopvar-experiment",
+      "video_path": "",
+      "date": "2026-03-15"
+    },
+    {
+      "file_num": 107,
+      "slug": "compile-time-interface-check",
+      "video_path": "",
+      "date": "2026-03-15"
+    },
+    {
+      "file_num": 68,
+      "slug": "log-fatal-http-server-trap",
+      "video_path": "",
+      "date": "2026-03-15"
+    },
+    {
+      "file_num": 92,
+      "slug": "go-partial-struct-init",
+      "video_path": "",
+      "date": "2026-03-15"
+    },
+    {
+      "file_num": 36,
+      "slug": "go-testify-overview",
+      "video_path": "",
+      "date": "2026-03-15"
+    },
+    {
+      "file_num": 143,
+      "slug": "go-switch-without-condition",
+      "video_path": "",
+      "date": "2026-03-15"
+    },
+    {
+      "file_num": 212,
+      "slug": "context-todo-vs-background",
+      "video_path": "",
+      "date": "2026-03-15"
+    },
+    {
+      "file_num": 264,
+      "slug": "go-debug-free-os-memory",
+      "video_path": "",
+      "date": "2026-03-15"
+    },
+    {
+      "file_num": 278,
+      "slug": "go-testability-design-indicator",
+      "video_path": "",
+      "date": "2026-03-15"
+    },
+    {
+      "file_num": 205,
+      "slug": "go-notification-channel-struct",
+      "video_path": "",
+      "date": "2026-03-15"
+    },
+    {
+      "file_num": 93,
+      "slug": "for-range-done-channel",
+      "video_path": "",
+      "date": "2026-03-15"
+    },
+    {
+      "file_num": 230,
+      "slug": "go-build-tags-secret",
+      "video_path": "",
+      "date": "2026-03-15"
+    },
+    {
+      "file_num": 23,
+      "slug": "go-defer-named-return-secret",
+      "video_path": "",
+      "date": "2026-03-15"
+    },
+    {
+      "file_num": 260,
+      "slug": "pprof-goroutine-dump",
+      "video_path": "",
+      "date": "2026-03-15"
+    },
+    {
+      "file_num": 198,
+      "slug": "go-recover-only-in-defer",
+      "video_path": "",
+      "date": "2026-03-15"
+    },
+    {
+      "file_num": 65,
+      "slug": "map-evacuate-buckets",
+      "video_path": "",
+      "date": "2026-03-15"
+    },
+    {
+      "file_num": 27,
+      "slug": "go-struct-json-tag-secret",
+      "video_path": "",
+      "date": "2026-03-15"
+    },
+    {
+      "file_num": 191,
+      "slug": "go-fmt-format-verbs",
+      "video_path": "",
+      "date": "2026-03-15"
+    }
+  ]
 }
