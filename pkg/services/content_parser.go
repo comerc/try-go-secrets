@@ -2,7 +2,9 @@ package services
 
 import (
 	"os"
+	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"go-secrets-pipeline/pkg/models"
@@ -49,18 +51,15 @@ func ParseMarkdown(filePath string) (*models.RawContent, error) {
 	return content, nil
 }
 
-// extractFileNum извлекает номер из имени файла (*__line-NNN.md или *-line-NNN.md)
+// extractFileNum извлекает номер из имени файла NNN.md.
 func extractFileNum(path string) int {
-	re := regexp.MustCompile(`(?:__|-)line-(\d+)`)
-	parts := strings.Split(path, "/")
-	name := parts[len(parts)-1]
-	m := re.FindStringSubmatch(name)
-	if m == nil {
+	name := filepath.Base(path)
+	if !regexp.MustCompile(`^\d{3}\.md$`).MatchString(name) {
 		return 0
 	}
-	n := 0
-	for _, ch := range m[1] {
-		n = n*10 + int(ch-'0')
+	n, err := strconv.Atoi(strings.TrimSuffix(name, ".md"))
+	if err != nil {
+		return 0
 	}
 	return n
 }

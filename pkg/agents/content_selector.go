@@ -11,7 +11,7 @@ import (
 	"go-secrets-pipeline/pkg/state"
 )
 
-var reLineNum = regexp.MustCompile(`(?:__|-)line-(\d+)\.md$`)
+var reLineNum = regexp.MustCompile(`^(\d{3})\.md$`)
 
 // SelectContent выбирает markdown-файл по номеру или случайно из необработанных
 func SelectContent(rawDir string, ps *state.ProcessedState, num int) (string, int, error) {
@@ -32,11 +32,11 @@ func SelectContent(rawDir string, ps *state.ProcessedState, num int) (string, in
 func selectByNum(files []string, num int, ps *state.ProcessedState) (string, int, error) {
 	target := fmt.Sprintf("%03d", num)
 	for _, f := range files {
-		m := reLineNum.FindStringSubmatch(f)
-		if m == nil {
+		fileNum, ok := parseFileNum(f)
+		if !ok {
 			continue
 		}
-		if m[1] == target || stripLeadingZeros(m[1]) == strconv.Itoa(num) {
+		if fmt.Sprintf("%03d", fileNum) == target {
 			if ps.IsProcessed(num) {
 				return "", 0, fmt.Errorf("файл #%d уже обработан", num)
 			}
@@ -53,12 +53,8 @@ func selectRandom(files []string, ps *state.ProcessedState) (string, int, error)
 	}
 
 	for _, f := range files {
-		m := reLineNum.FindStringSubmatch(f)
-		if m == nil {
-			continue
-		}
-		n, err := strconv.Atoi(m[1])
-		if err != nil {
+		n, ok := parseFileNum(f)
+		if !ok {
 			continue
 		}
 		if !ps.IsProcessed(n) {
@@ -79,12 +75,17 @@ func selectRandom(files []string, ps *state.ProcessedState) (string, int, error)
 	return chosen.path, chosen.num, nil
 }
 
-func stripLeadingZeros(s string) string {
-	n, err := strconv.Atoi(s)
-	if err != nil {
-		return s
+func parseFileNum(path string) (int, bool) {
+	base := filepath.Base(path)
+	m := reLineNum.FindStringSubmatch(base)
+	if m == nil {
+		return 0, false
 	}
-	return strconv.Itoa(n)
+	n, err := strconv.Atoi(m[1])
+	if err != nil {
+		return 0, false
+	}
+	return n, true
 }
 
 // FileExists проверяет существование файла

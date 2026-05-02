@@ -6,8 +6,9 @@ cd "$(dirname "$0")/.."
 # Загружаем .env
 set -a; [ -f .env ] && source .env; set +a
 
-VIA_DOCKER="${VIA_DOCKER:-false}"
 NUM=${1:-""}
+PUPPETEER_HELPER="$(dirname "$0")/puppeteer.sh"
+trap "$PUPPETEER_HELPER stop" EXIT
 
 if [ -z "$NUM" ]; then
   echo "Использование: ./scripts/fix.sh <номер>"
@@ -15,16 +16,10 @@ if [ -z "$NUM" ]; then
   exit 1
 fi
 
-echo "▶ Перегенерация аудио+видео для #$NUM (без z.ai)"
+echo "▶ Перегенерация аудио+видео для #$NUM (без LLM)"
 
-# Puppeteer всегда через docker
-docker compose up -d --build puppeteer
+PUPPETEER_URL="$("$PUPPETEER_HELPER" start >/dev/null; "$PUPPETEER_HELPER" url)"
+export PUPPETEER_URL
+echo "▶ Puppeteer: $PUPPETEER_URL"
 
-if [ "$VIA_DOCKER" = "true" ]; then
-  # ── Pipeline в Docker ───────────────────────────────────────────
-  docker compose run --rm --build pipeline -fix "$NUM"
-
-else
-  # ── Pipeline локально ───────────────────────────────────────────
-  go run ./cmd/main.go -fix "$NUM"
-fi
+go run ./cmd/main.go -fix "$NUM"

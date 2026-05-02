@@ -56,7 +56,11 @@ func (s *VideoService) RenderCodeVideo(spec *models.VideoSpec, code, lang string
 	rawVideoPath := filepath.Join(
 		s.cfg.OutputDir, "videos", "raw", spec.Slug+"-code.mp4",
 	)
-	if err := os.MkdirAll(filepath.Dir(rawVideoPath), 0755); err != nil {
+	absRawVideoPath, err := filepath.Abs(rawVideoPath)
+	if err != nil {
+		return "", fmt.Errorf("абсолютный путь raw-видео: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(absRawVideoPath), 0755); err != nil {
 		return "", err
 	}
 
@@ -64,7 +68,7 @@ func (s *VideoService) RenderCodeVideo(spec *models.VideoSpec, code, lang string
 		Code:          code,
 		Lang:          lang,
 		Slug:          spec.Slug,
-		OutputPath:    rawVideoPath,
+		OutputPath:    absRawVideoPath,
 		Width:         spec.Width,
 		Height:        spec.Height,
 		FPS:           spec.FPS,
@@ -96,7 +100,7 @@ func (s *VideoService) RenderCodeVideo(spec *models.VideoSpec, code, lang string
 		return "", fmt.Errorf("Puppeteer render: %s", renderResp.Error)
 	}
 
-	return rawVideoPath, nil
+	return absRawVideoPath, nil
 }
 
 // MergeAudioVideo объединяет аудио и видео через FFmpeg

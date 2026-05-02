@@ -2,22 +2,34 @@
 
 Автоматизированный пайплайн генерации YouTube Shorts (<60 сек) из 286 markdown-файлов с секретами Go.
 
-**Стек:** Go · SaluteSpeech TTS · z.ai / Claude Code CLI · Puppeteer · FFmpeg · Docker
+**Стек:** Go · Gemini TTS · Codex CLI / Claude Code CLI / z.ai · Puppeteer · FFmpeg
 
 ---
 
 ## Режимы запуска
 
-В `.env` два флага, которые управляют режимом:
+В `.env` используются ключевые параметры запуска:
 
 | Переменная | Значение | Эффект |
 |---|---|---|
-| `VIA_DOCKER` | `false` (по умолчанию) | pipeline запускается локально через `go run` |
-| `VIA_DOCKER` | `true` | pipeline запускается в Docker-контейнере |
-| `LLM_BACKEND` | `claude-cli` (по умолчанию) | инференс через локальный Claude Code CLI |
-| `LLM_BACKEND` | `zai` | инференс через z.ai API (GLM) |
+| `LLM_BACKEND` | `codex-cli` (по умолчанию) | инференс через локальный Codex CLI |
+| `LLM_BACKEND` | `claude-cli` | инференс через локальный Claude Code CLI |
+| `LLM_BACKEND` | `zai-api` | инференс через z.ai API |
+| `LLM_MODEL` | например `gpt-5.5` | модель для Codex, Claude и z.ai |
+| `LLM_EFFORT` | `medium` по умолчанию | уровень reasoning/thinking для LLM-бэкенда |
+| `PUPPETEER_URL` | выбирается автоматически, если не задан | адрес локально запущенного Puppeteer-сервиса |
 
-> **Puppeteer** всегда запускается через `docker compose` — независимо от `VIA_DOCKER`.
+Поддерживаемые уровни `LLM_EFFORT` зависят от бэкенда:
+
+- `claude-cli`: `low`, `medium`, `high`, `xhigh`, `max`
+- `codex-cli`: `low`, `medium`, `high`, `xhigh`
+- `zai-api`: `low`, `medium`, `high`
+
+Для `zai-api` значение `LLM_EFFORT` маппится так:
+
+- `low` -> `thinking.disabled`
+- `medium` -> `thinking.enabled`
+- `high` -> `thinking.enabled` + `clear_thinking=false`
 
 ---
 
@@ -27,8 +39,8 @@
 # 1. Скопировать и заполнить ключи API
 cp .env.example .env
 
-# 2. Убедиться что Claude Code CLI залогинен
-claude --version
+# 2. Убедиться что Codex CLI залогинен
+codex login
 
 # 3. Конкретный файл по номеру
 ./scripts/run.sh 43
@@ -41,23 +53,11 @@ claude --version
 ./scripts/loop.sh
 ```
 
-`run.sh` поднимает puppeteer-контейнер (`docker compose up -d`) и запускает pipeline локально (`go run ./cmd/main.go`). Переменные из `.env` подхватываются автоматически.
+`run.sh` запускает pipeline локально (`go run ./cmd/main.go`). Если Puppeteer ещё не установлен, скрипт сам сделает `npm install` в `puppeteer/`, поднимет сервис на свободном порту и дождётся `/health`.
 
 Результаты:
 - `output/` — видео, аудио, сценарии
 - `state/` — `processed.json`, `tts_usage.json`
-
----
-
-## Запуск через Docker (VIA_DOCKER=true)
-
-```bash
-# .env: VIA_DOCKER=true
-./scripts/run.sh 43
-# Эквивалент: docker compose run --rm --build pipeline -num 43
-```
-
-Используй этот режим для воспроизводимого окружения или CI. Claude Code CLI в Docker недоступен, поэтому при `VIA_DOCKER=true` нужен `LLM_BACKEND=zai`.
 
 ---
 
@@ -75,8 +75,8 @@ output/scripts/YYYY-MM-DD__NNN.json
 
 | Поле | Что менять |
 |---|---|
-| `NarrationSSML` | SSML для TTS — ударения (`гор+утина`), паузы (`<break time="300ms"/>`), акценты (`*слово*`) |
-| `NarrationText` | Чистый текст субтитров (без SSML) |
+| `NarrationTags` | Audio-Tags для TTS — эмоции (`[friendly]`), паузы (`[pause: short]`), акцент (`[emphasized] слово`) |
+| `NarrationText` | Чистый текст субтитров (без Audio-Tags) |
 | `Segments[].Text` | Текст отдельного сегмента субтитров |
 
 **3. Запустить перегенерацию**
@@ -85,7 +85,7 @@ output/scripts/YYYY-MM-DD__NNN.json
 ./scripts/fix.sh 43
 ```
 
-Скрипт пропускает LLM, берёт отредактированный `NarrationSSML` и заново синтезирует аудио (SaluteSpeech) + рендерит видео (Puppeteer + FFmpeg).
+Скрипт пропускает LLM, берёт отредактированный `NarrationTags` и заново синтезирует аудио + рендерит видео (Puppeteer + FFmpeg).
 
 ---
 
@@ -99,20 +99,7 @@ go test ./tests/...
 go run ./cmd/main.go -test-tts "Привет мир"
 # → output/audio/test-tts.wav
 
-# Логи puppeteer
-docker compose logs -f puppeteer
-
-# Остановить puppeteer
-docker compose down
-```
-
-Для быстрой итерации над шаблонами без пересборки контейнера — `docker-compose.override.yml` (не коммитить):
-```yaml
-services:
-  puppeteer:
-    volumes:
-      - ./puppeteer:/app
-      - ./static:/static
+# Puppeteer поднимается автоматически через `./scripts/run.sh` и `./scripts/fix.sh`
 ```
 
 ---
@@ -121,15 +108,14 @@ services:
 
 | Переменная | Описание |
 |---|---|
-| `VIA_DOCKER` | `false` — pipeline локально, `true` — pipeline в Docker |
-| `LLM_BACKEND` | `claude-cli` — Claude Code CLI, `zai` — z.ai API |
-| `ZAI_API_KEY` | Ключ z.ai API (нужен только при `LLM_BACKEND=zai`) |
-| `ZAI_MODEL` | Модель z.ai, по умолчанию `glm-5` |
-| `SALUTESPEECH_CLIENT_ID` | SaluteSpeech Client ID |
-| `SALUTESPEECH_CLIENT_SECRET` | SaluteSpeech Client Secret |
-| `SALUTESPEECH_SCOPE` | `SALUTE_SPEECH_PERS` (физ. лицо) или `SALUTE_SPEECH_CORP` |
-| `SALUTESPEECH_VOICE` | `Nec_24000` (нейтральный женский), `Bys_24000` (деловой) |
-| `PUPPETEER_URL` | URL puppeteer-сервиса, по умолчанию `http://localhost:3333` |
+| `LLM_BACKEND` | `codex-cli` — Codex CLI, `claude-cli` — Claude Code CLI, `zai-api` — z.ai API |
+| `LLM_MODEL` | Модель для Codex, Claude и z.ai (`glm-5.1` по умолчанию для z.ai) |
+| `LLM_EFFORT` | уровень effort/thinking для LLM-бэкенда |
+| `ZAI_API_KEY` | Ключ z.ai API |
+| `GEMINI_API_KEY` | Ключ Gemini API для TTS |
+| `GEMINI_TTS_MODEL` | Модель Gemini TTS, по умолчанию `gemini-3.1-flash-tts-preview` |
+| `GEMINI_TTS_VOICE` | Голос Gemini TTS; если пусто, выбирается случайно из `x-voices.md` |
+| `PUPPETEER_URL` | URL локального puppeteer-сервиса, подбирается автоматически |
 | `RAW_DIR` | Папка с markdown-файлами, по умолчанию `./raw` |
 | `OUTPUT_DIR` | Папка с результатами, по умолчанию `./output` |
 | `STATE_DIR` | Папка с состоянием, по умолчанию `./state` |

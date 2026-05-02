@@ -43,9 +43,10 @@ app.post('/render', async (req, res) => {
 
   let browser;
   try {
+    const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || puppeteer.executablePath();
     browser = await puppeteer.launch({
-      headless: 'new',
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+      headless: true,
+      executablePath,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -127,7 +128,9 @@ app.post('/render', async (req, res) => {
   } catch (err) {
     if (browser) await browser.close().catch(() => {});
     console.error('Ошибка рендеринга:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({
+      error: err && err.message ? err.message : 'unknown puppeteer error',
+    });
   }
 });
 

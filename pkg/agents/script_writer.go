@@ -22,21 +22,23 @@ const (
 )
 
 type ScriptWriter struct {
-	llm  *services.LLMService
+	llm *services.LLMService
+	tts *services.TTSService
+
 	lang string
 }
 
-func NewScriptWriter(llm *services.LLMService, lang string) *ScriptWriter {
+func NewScriptWriter(llm *services.LLMService, tts *services.TTSService, lang string) *ScriptWriter {
 	if lang == "" {
 		lang = "ru"
 	}
-	return &ScriptWriter{llm: llm, lang: lang}
+	return &ScriptWriter{llm: llm, tts: tts, lang: lang}
 }
 
 // llmSegment — один сегмент из ответа LLM
 type llmSegment struct {
 	Text string `json:"text"`
-	SSML string `json:"ssml"`
+	Tags string `json:"tags"`
 }
 
 // langNames — название языка для промпта
@@ -47,7 +49,7 @@ var langNames = map[string]string{
 }
 
 // buildSystemPrompt формирует системный промпт с учётом языка вывода
-func buildSystemPrompt(lang string) string {
+func buildSystemPrompt(lang string) (string, error) {
 	langName, ok := langNames[lang]
 	if !ok {
 		lang = "ru"
@@ -56,47 +58,9 @@ func buildSystemPrompt(lang string) string {
 
 	narrativeLang := fmt.Sprintf("- Язык нарратива и субтитров: %s (%s)", langName, lang)
 	codeLang := fmt.Sprintf("- Комментарии в коде пиши на %s", langName)
-
-	var ssmlSection string
-	if lang == "ru" {
-		ssmlSection = `Правила SSML (поле ssml каждого сегмента) — синтезатор SaluteSpeech:
-
-Поле ssml — это полноценная озвучка сегмента с богатой SSML-разметкой. Используй все доступные инструменты:
-
-1. Логическое ударение — выдели *звёздочками* самое важное слово в предложении:
-   Пример: "это *ключевое* поведение горутин"
-
-2. Паузы — расставляй <break time="300ms"/> там где оратор делал бы вдох или смысловую паузу:
-   Пример: "мьютекс блокирует доступ. <break time="300ms"/> Только один поток входит."
-
-3. Go-термины и иностранные слова — ОБЯЗАТЕЛЬНО транслитерируй в русскую фонетику с ударением:
-   Пример: "используй goroutine" → "используй горут+ину"
-	 Пример: splitHostPort → "сплит-хост-порт"
-
-4. Ударения в остальных словах - НЕ НАДО РАССТАВЛЯТЬ, кроме того
-   НЕЛЬЗЯ ставить "+" если это часть кода: Ctrl+C → пиши Ctrl-C
-
-5. Аббревиатуры — читай по буквам:
-   <say-as interpret-as="characters">API</say-as> → "эй-пи-ай"
-   Применяй к: API, HTTP, HTTPS, SQL, URL, gRPC, UUID, CSV, JWT, TLS и т.п.
-
-6. Имена файлов: output.go → output точка go
-   Числовые порты: 8080 → восемь ноль восемь ноль
-
-7. Не используй восклицательный знак. Используй только знак вопроса или точку для окончания предложений.
-
-НЕ оборачивай сегмент в <speak> — добавляется автоматически`
-	} else {
-		ssmlSection = `SSML rules for each segment (SaluteSpeech synthesizer):
-
-1. Logical emphasis — wrap the key word in *asterisks*: "this is the *key* behaviour"
-2. Pauses — use <break time="300ms"/> at natural breath points
-3. Abbreviations — spell out with <say-as interpret-as="characters">API</say-as>
-   Apply to: API, HTTP, HTTPS, SQL, URL, gRPC, UUID, CSV, JWT, TLS etc.
-4. File names: output.go → "output dot go"
-   Numeric ports: 8080 → "eight zero eight zero"
-
-Do NOT wrap segment in <speak> — it is added automatically`
+	narrationSection, err := readAudioTagsInstruction()
+	if err != nil {
+		return "", err
 	}
 
 	return fmt.Sprintf(`You are creating a script for a YouTube Shorts video about Go secrets.
@@ -111,7 +75,11 @@ Narrative rules:
 - FORBIDDEN: use exclamation mark "!" — it creates an unnatural accent in TTS.
 - Use only question marks and periods at the end of sentences.
 
+---
+
 %s
+
+---
 
 Code rules:
 %s
@@ -123,18 +91,22 @@ Code rules:
 Reply with ONLY JSON:
 {
   "segments": [
-    {"text": "clean segment text (for subtitles)", "ssml": "text with SSML markup (for voice)"},
-    {"text": "next segment.", "ssml": "next *segment* <break time=\"200ms\"/>."}
+    {"text": "clean segment text (for subtitles)", "tags": "text with Audio-Tags markup (for voice)"},
+    {"text": "next segment.", "tags": "[pause: short] [emphasized] next segment."}
   ],
-  "title": "short title for file name (latin, hyphens)",
+	"title": "short title",
+  "slug": "short slug for file name (latin, hyphens)",
   "code": "code block to display",
   "codeLang": "go"
-}`, narrativeLang, ssmlSection, codeLang)
+}`, narrativeLang, narrationSection, codeLang), nil
 }
 
 // Write генерирует сценарий для видео из контента
 func (sw *ScriptWriter) Write(content *models.RawContent) (*models.Script, error) {
-	systemPrompt := buildSystemPrompt(sw.lang)
+	systemPrompt, err := buildSystemPrompt(sw.lang)
+	if err != nil {
+		return nil, fmt.Errorf("build system prompt: %w", err)
+	}
 
 	mainCode := ""
 	if len(content.CodeBlocks) > 0 {
@@ -151,27 +123,24 @@ func (sw *ScriptWriter) Write(content *models.RawContent) (*models.Script, error
 		return nil, fmt.Errorf("script_writer LLM: %w", err)
 	}
 
-	llmSegs, title, displayCode, displayLang, err := parseScriptJSON(raw)
+	llmSegs, title, slug, displayCode, displayLang, err := parseScriptJSON(raw)
 	if err != nil {
-		// Fallback: весь ответ как один сегмент
-		text := strings.TrimSpace(raw)
-		llmSegs = []llmSegment{{Text: text, SSML: text}}
-		title = fmt.Sprintf("go-secret-%d", content.FileNum)
+		return nil, err
 	}
 
-	// Собираем NarrationText (чистый) и NarrationSSML из сегментов
+	// Собираем NarrationText (чистый) и NarrationTags из сегментов
 	textParts := make([]string, 0, len(llmSegs))
-	ssmlParts := make([]string, 0, len(llmSegs))
+	tagParts := make([]string, 0, len(llmSegs))
 	for _, s := range llmSegs {
 		textParts = append(textParts, s.Text)
-		ssml := s.SSML
-		if ssml == "" {
-			ssml = s.Text
+		tags := s.Tags
+		if tags == "" {
+			tags = s.Text
 		}
-		ssmlParts = append(ssmlParts, ssml)
+		tagParts = append(tagParts, tags)
 	}
 	narrationText := strings.Join(textParts, " ")
-	narrationSSML := "<speak>" + strings.Join(ssmlParts, " ") + "</speak>"
+	narrationTags := strings.Join(tagParts, " ")
 
 	// Обрезаем если вышли за лимит (safety net)
 	narrationText = truncateToFit(narrationText, maxDurationSec)
@@ -179,12 +148,19 @@ func (sw *ScriptWriter) Write(content *models.RawContent) (*models.Script, error
 	chars := utf8.RuneCountInString(narrationText)
 	duration := float64(chars) / russianCharsPerSec
 
+	voice, err := sw.tts.SelectVoice("")
+	if err != nil {
+		return nil, fmt.Errorf("выбор голоса TTS: %w", err)
+	}
+
 	script := &models.Script{
 		FileNum:       content.FileNum,
-		Slug:          sanitizeSlug(title),
+		Title:         title,
+		Slug:          sanitizeSlug(slug),
+		Voice:         voice,
 		SourceFile:    content.FilePath,
 		NarrationText: narrationText,
-		NarrationSSML: narrationSSML,
+		NarrationTags: narrationTags,
 		TotalSeconds:  math.Round(duration*10) / 10,
 		Segments:      buildSegments(llmSegs),
 		DisplayCode:   displayCode,
@@ -213,7 +189,7 @@ func (sw *ScriptWriter) Save(script *models.Script, outputDir string) (string, e
 	return path, os.WriteFile(path, data, 0644)
 }
 
-func parseScriptJSON(raw string) (segments []llmSegment, title, code, codeLang string, err error) {
+func parseScriptJSON(raw string) (segments []llmSegment, title, slug, code, codeLang string, err error) {
 	// Вырезаем JSON из возможной обёртки в markdown
 	re := regexp.MustCompile("(?s)```(?:json)?\\s*(\\{.*?\\})\\s*```")
 	if m := re.FindStringSubmatch(raw); m != nil {
@@ -223,16 +199,25 @@ func parseScriptJSON(raw string) (segments []llmSegment, title, code, codeLang s
 	var result struct {
 		Segments []llmSegment `json:"segments"`
 		Title    string       `json:"title"`
+		Slug     string       `json:"slug"`
 		Code     string       `json:"code"`
 		CodeLang string       `json:"codeLang"`
 	}
 	if err := json.Unmarshal([]byte(strings.TrimSpace(raw)), &result); err != nil {
-		return nil, "", "", "", err
+		return nil, "", "", "", "", err
 	}
 	if result.CodeLang == "" {
 		result.CodeLang = "go"
 	}
-	return result.Segments, result.Title, result.Code, result.CodeLang, nil
+	return result.Segments, result.Title, result.Slug, result.Code, result.CodeLang, nil
+}
+
+func readAudioTagsInstruction() (string, error) {
+	data, err := os.ReadFile("x-audio-tags.md")
+	if err != nil {
+		return "", fmt.Errorf("read x-audio-tags.md: %w", err)
+	}
+	return strings.TrimSpace(string(data)), nil
 }
 
 func truncateToFit(text string, maxSec float64) string {

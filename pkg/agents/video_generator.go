@@ -38,12 +38,18 @@ func (g *VideoGenerator) Generate(script *models.Script, content *models.RawCont
 	}
 	audioPath := filepath.Join(audioDir, fmt.Sprintf("%s__%03d.wav", date, script.FileNum))
 
-	fmt.Printf("  🎙  Синтез голоса (SaluteSpeech)...\n")
-	ttsText := script.NarrationSSML
+	voice, err := g.tts.SelectVoice(script.Voice)
+	if err != nil {
+		return nil, fmt.Errorf("выбор голоса TTS: %w", err)
+	}
+	script.Voice = voice
+
+	fmt.Printf("  🎙  Синтез голоса (Audio-Tags, %s)...\n", voice)
+	ttsText := script.NarrationTags
 	if ttsText == "" {
 		ttsText = script.NarrationText
 	}
-	if err := g.tts.Synthesize(ttsText, audioPath); err != nil {
+	if err := g.tts.Synthesize(ttsText, voice, audioPath); err != nil {
 		return nil, fmt.Errorf("TTS синтез: %w", err)
 	}
 	result.AudioPath = audioPath
@@ -60,6 +66,10 @@ func (g *VideoGenerator) Generate(script *models.Script, content *models.RawCont
 
 	// 2. Рендер видео с кодом (если есть блоки кода)
 	videoPath := filepath.Join(g.cfg.OutputDir, "videos", fmt.Sprintf("%s__%03d.mp4", date, script.FileNum))
+	videoPath, err = filepath.Abs(videoPath)
+	if err != nil {
+		return nil, fmt.Errorf("абсолютный путь финального видео: %w", err)
+	}
 	result.VideoPath = videoPath
 
 	// Код для отображения: приоритет у script.DisplayCode (сгенерирован LLM),

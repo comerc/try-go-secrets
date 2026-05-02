@@ -30,7 +30,12 @@ func main() {
 		tts := services.NewTTSService(cfg)
 		outPath := "output/audio/test-tts.wav"
 		fmt.Printf("Синтез: %q\n", *testTTS)
-		if err := tts.Synthesize(*testTTS, outPath); err != nil {
+		voice, err := tts.SelectVoice("")
+		if err != nil {
+			log.Fatalf("TTS голос: %v", err)
+		}
+		fmt.Printf("Голос: %s\n", voice)
+		if err := tts.Synthesize(*testTTS, voice, outPath); err != nil {
 			log.Fatalf("TTS ошибка: %v", err)
 		}
 		fmt.Printf("Аудио сохранено: %s\n", outPath)

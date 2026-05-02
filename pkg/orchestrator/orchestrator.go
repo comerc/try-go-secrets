@@ -50,7 +50,7 @@ func New(cfg *config.Config) (*Orchestrator, error) {
 		llm:       llm,
 		tts:       tts,
 		video:     video,
-		writer:    agents.NewScriptWriter(llm, cfg.Lang),
+		writer:    agents.NewScriptWriter(llm, tts, cfg.Lang),
 		checker:   agents.NewQualityChecker(video),
 		gen:       agents.NewVideoGenerator(cfg, tts, video),
 	}, nil
@@ -120,7 +120,7 @@ func (o *Orchestrator) Run(fileNum int) (*models.ProductionResult, error) {
 	}
 
 	// Обновляем состояние
-	if err := o.processed.Add(num, script.Slug, result.VideoPath); err != nil {
+	if err := o.processed.Add(num); err != nil {
 		log.Printf("⚠ Ошибка записи processed.json: %v", err)
 	}
 	if err := o.ttsUsage.Add(narrationChars); err != nil {
@@ -157,7 +157,7 @@ func Init(cfg *config.Config) error {
 	return ensureOutputDirs(cfg)
 }
 
-// RunFix перегенерирует аудио и видео из существующего сценария (без запроса к z.ai).
+// RunFix перегенерирует аудио и видео из существующего сценария (без запроса к LLM).
 // Используется после ручной правки output/scripts/*__NNN.json.
 func (o *Orchestrator) RunFix(fileNum int) (*models.ProductionResult, error) {
 	log.SetFlags(log.Ltime)

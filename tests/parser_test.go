@@ -27,7 +27,7 @@ result, _ := divide(10, 2)
 ` + "```"
 
 	tmpDir := t.TempDir()
-	filePath := filepath.Join(tmpDir, "test__line-042.md")
+	filePath := filepath.Join(tmpDir, "042.md")
 	if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
 		t.Fatal(err)
 	}

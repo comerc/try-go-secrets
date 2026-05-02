@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -19,19 +21,25 @@ type LLMService struct {
 	client *http.Client
 }
 
-type llmRequest struct {
+type ZAIRequest struct {
 	Model    string       `json:"model"`
-	Messages []llmMessage `json:"messages"`
+	Messages []ZAIMessage `json:"messages"`
+	Thinking *thinkingCfg `json:"thinking,omitempty"`
 }
 
-type llmMessage struct {
+type thinkingCfg struct {
+	Type          string `json:"type"`
+	ClearThinking *bool  `json:"clear_thinking,omitempty"`
+}
+
+type ZAIMessage struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
 }
 
-type llmResponse struct {
+type ZAIResponse struct {
 	Choices []struct {
-		Message llmMessage `json:"message"`
+		Message ZAIMessage `json:"message"`
 	} `json:"choices"`
 	Error *struct {
 		Message string `json:"message"`
@@ -47,10 +55,16 @@ func NewLLMService(cfg *config.Config) *LLMService {
 
 // Complete отправляет запрос к LLM-бэкенду и возвращает ответ
 func (s *LLMService) Complete(systemPrompt, userPrompt string) (string, error) {
-	if s.cfg.LLMBackend == "claude-cli" {
+	switch s.cfg.LLMBackend {
+	case "codex-cli":
+		return s.completeCodex(systemPrompt, userPrompt)
+	case "claude-cli":
 		return s.completeCLI(systemPrompt, userPrompt)
+	case "zai-api":
+		return s.completeZAI(systemPrompt, userPrompt)
+	default:
+		return "", fmt.Errorf("неизвестный LLM_BACKEND: %s", s.cfg.LLMBackend)
 	}
-	return s.completeZAI(systemPrompt, userPrompt)
 }
 
 func (s *LLMService) completeCLI(systemPrompt, userPrompt string) (string, error) {
@@ -59,7 +73,17 @@ func (s *LLMService) completeCLI(systemPrompt, userPrompt string) (string, error
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "claude", "-p", combined, "--output-format", "text")
+	effort := s.cfg.LLMEffort
+	if effort == "" {
+		effort = "medium"
+	}
+
+	args := []string{"-p", combined, "--output-format", "text"}
+	if s.cfg.LLMModel != "" {
+		args = append(args, "--model", s.cfg.LLMModel)
+	}
+	args = append(args, "--effort", effort)
+	cmd := exec.CommandContext(ctx, "claude", args...)
 	out, err := cmd.Output()
 	if err != nil {
 		if e, ok := err.(*exec.ExitError); ok {
@@ -71,13 +95,73 @@ func (s *LLMService) completeCLI(systemPrompt, userPrompt string) (string, error
 	return strings.TrimSpace(string(out)), nil
 }
 
+func (s *LLMService) completeCodex(systemPrompt, userPrompt string) (string, error) {
+	combined := systemPrompt + "\n\n---\n\n" + userPrompt
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+
+	tmpDir, err := os.MkdirTemp("", "go-secrets-codex-*")
+	if err != nil {
+		return "", fmt.Errorf("codex-cli: создать temp dir: %w", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	effort := s.cfg.LLMEffort
+	if effort == "" {
+		effort = "medium"
+	}
+
+	lastMessagePath := filepath.Join(tmpDir, "last-message.txt")
+	args := []string{"exec", "--ephemeral", "--output-last-message", lastMessagePath, "--cd", "."}
+	if s.cfg.LLMModel != "" {
+		args = append(args, "--model", s.cfg.LLMModel)
+	}
+	args = append(args, "--config", "model_reasoning_effort="+effort)
+	args = append(args, "-")
+	cmd := exec.CommandContext(ctx, "codex", args...)
+	cmd.Stdin = strings.NewReader(combined)
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("codex-cli: %w\noutput: %s", err, string(out))
+	}
+
+	msg, err := os.ReadFile(lastMessagePath)
+	if err != nil {
+		return "", fmt.Errorf("codex-cli: прочитать ответ: %w\noutput: %s", err, string(out))
+	}
+
+	return strings.TrimSpace(string(msg)), nil
+}
+
 func (s *LLMService) completeZAI(systemPrompt, userPrompt string) (string, error) {
-	reqBody := llmRequest{
-		Model: s.cfg.ZAIModel,
-		Messages: []llmMessage{
+	model := s.cfg.LLMModel
+	if model == "" {
+		model = "glm-5.1"
+	}
+	effort := s.cfg.LLMEffort
+	if effort == "" {
+		effort = "medium"
+	}
+
+	thinkingEnabled := effort != "low"
+	preservedThinking := effort == "high"
+
+	reqBody := ZAIRequest{
+		Model: model,
+		Messages: []ZAIMessage{
 			{Role: "system", Content: systemPrompt},
 			{Role: "user", Content: userPrompt},
 		},
+		Thinking: &thinkingCfg{Type: "disabled"},
+	}
+	if thinkingEnabled {
+		reqBody.Thinking.Type = "enabled"
+	}
+	if preservedThinking {
+		clearThinking := false
+		reqBody.Thinking.ClearThinking = &clearThinking
 	}
 
 	data, err := json.Marshal(reqBody)
@@ -107,7 +191,7 @@ func (s *LLMService) completeZAI(systemPrompt, userPrompt string) (string, error
 		return "", fmt.Errorf("z.ai ошибка %d: %s", resp.StatusCode, string(body))
 	}
 
-	var llmResp llmResponse
+	var llmResp ZAIResponse
 	if err := json.Unmarshal(body, &llmResp); err != nil {
 		return "", fmt.Errorf("парсинг z.ai ответа: %w", err)
 	}

@@ -6,30 +6,18 @@ cd "$(dirname "$0")/.."
 # Загружаем .env
 set -a; [ -f .env ] && source .env; set +a
 
-VIA_DOCKER="${VIA_DOCKER:-false}"
+PUPPETEER_HELPER="$(dirname "$0")/puppeteer.sh"
+trap "$PUPPETEER_HELPER stop" EXIT
+
+PUPPETEER_URL="$("$PUPPETEER_HELPER" start >/dev/null; "$PUPPETEER_HELPER" url)"
+export PUPPETEER_URL
+echo "▶ Puppeteer: $PUPPETEER_URL"
+
 NUM=${1:-""}
-
-# Puppeteer всегда через docker
-docker compose up -d --build puppeteer
-
-if [ "$VIA_DOCKER" = "true" ]; then
-  # ── Pipeline в Docker ───────────────────────────────────────────
-  if [ -n "$NUM" ]; then
-    echo "▶ Генерация видео для файла #$NUM"
-    docker compose run --rm --build pipeline -num "$NUM"
-  else
-    echo "▶ Генерация видео для случайного необработанного файла"
-    docker compose run --rm --build pipeline
-  fi
-
+if [ -n "$NUM" ]; then
+  echo "▶ Генерация видео для файла #$NUM"
+  go run ./cmd/main.go -num "$NUM"
 else
-  # ── Pipeline локально ───────────────────────────────────────────
-  # PUPPETEER_URL из .env уже указывает на localhost:3333 — используем как есть
-  if [ -n "$NUM" ]; then
-    echo "▶ Генерация видео для файла #$NUM (локально, puppeteer=docker)"
-    go run ./cmd/main.go -num "$NUM"
-  else
-    echo "▶ Генерация видео для случайного необработанного файла (локально, puppeteer=docker)"
-    go run ./cmd/main.go
-  fi
+  echo "▶ Генерация видео для случайного необработанного файла"
+  go run ./cmd/main.go
 fi
