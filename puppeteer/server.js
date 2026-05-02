@@ -32,6 +32,7 @@ app.post('/render', async (req, res) => {
     fps = 30,
     audioDuration = 50,
     subtitleWords = [],
+    playlistTitle = '',
   } = req.body;
 
   if (!code || !outputPath) {
@@ -95,10 +96,11 @@ app.post('/render', async (req, res) => {
       const partial = code.slice(0, charsShown);
       const currentWordIdx = frameWordIdx[frame];
 
-      await page.evaluate((text, language, words, wordIdx) => {
+      await page.evaluate((text, language, words, wordIdx, title) => {
         if (typeof updateCode === 'function') updateCode(text, language);
         if (typeof updateSubtitle === 'function') updateSubtitle(words, wordIdx);
-      }, partial, lang, subtitleDisplayWords, currentWordIdx);
+        if (typeof updateTerminalTitle === 'function') updateTerminalTitle(title);
+      }, partial, lang, subtitleDisplayWords, currentWordIdx, playlistTitle);
 
       const framePath = path.join(screenshotsDir, `frame-${String(frame).padStart(6, '0')}.png`);
       await page.screenshot({ path: framePath, type: 'png' });

@@ -7,7 +7,7 @@ import (
 
 type Config struct {
 	// z.ai API
-	ZAIApiKey string `envconfig:"ZAI_API_KEY" required:"true"`
+	ZAIApiKey string `envconfig:"ZAI_API_KEY"`
 	ZAIApiURL string `envconfig:"ZAI_API_URL" default:"https://api.z.ai/api/coding/paas/v4"`
 
 	// Gemini TTS
@@ -24,9 +24,10 @@ type Config struct {
 	StateDir  string `envconfig:"STATE_DIR" default:"./state"`
 
 	// Video settings
-	VideoWidth  int `envconfig:"VIDEO_WIDTH" default:"1080"`
-	VideoHeight int `envconfig:"VIDEO_HEIGHT" default:"1920"`
-	VideoFPS    int `envconfig:"VIDEO_FPS" default:"30"`
+	VideoWidth    int    `envconfig:"VIDEO_WIDTH" default:"1080"`
+	VideoHeight   int    `envconfig:"VIDEO_HEIGHT" default:"1920"`
+	VideoFPS      int    `envconfig:"VIDEO_FPS" default:"30"`
+	PlaylistTitle string `envconfig:"PLAYLIST_TITLE"`
 
 	// Language: ru (default), en, cn, hi, ja, es
 	Lang string `envconfig:"LANG" default:"ru"`
@@ -35,6 +36,15 @@ type Config struct {
 	LLMBackend string `envconfig:"LLM_BACKEND" default:"codex-cli"`
 	LLMModel   string `envconfig:"LLM_MODEL"`
 	LLMEffort  string `envconfig:"LLM_EFFORT"`
+
+	// YouTube publishing
+	YouTubeEnabled          bool   `envconfig:"YOUTUBE_ENABLED" default:"false"`
+	YouTubeClientID         string `envconfig:"YOUTUBE_CLIENT_ID"`
+	YouTubeClientSecret     string `envconfig:"YOUTUBE_CLIENT_SECRET"`
+	YouTubeRefreshToken     string `envconfig:"YOUTUBE_REFRESH_TOKEN"`
+	YouTubePlaylistID       string `envconfig:"YOUTUBE_PLAYLIST_ID" required:"true"`
+	YouTubeScheduleLocation string `envconfig:"YOUTUBE_SCHEDULE_LOCATION"`
+	YouTubeScheduleTime     string `envconfig:"YOUTUBE_SCHEDULE_TIME" default:"12:00"`
 }
 
 func Load() (*Config, error) {

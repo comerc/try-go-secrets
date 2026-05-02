@@ -36,6 +36,7 @@ type renderRequest struct {
 	FPS           int            `json:"fps"`
 	AudioDuration float64        `json:"audioDuration"`
 	SubtitleWords []SubtitleWord `json:"subtitleWords"`
+	PlaylistTitle string         `json:"playlistTitle"`
 }
 
 type renderResponse struct {
@@ -74,6 +75,7 @@ func (s *VideoService) RenderCodeVideo(spec *models.VideoSpec, code, lang string
 		FPS:           spec.FPS,
 		AudioDuration: audioDuration,
 		SubtitleWords: subtitleWords,
+		PlaylistTitle: spec.PlaylistTitle,
 	}
 
 	data, err := json.Marshal(reqBody)

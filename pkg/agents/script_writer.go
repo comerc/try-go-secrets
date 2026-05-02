@@ -94,7 +94,7 @@ Reply with ONLY JSON:
     {"text": "clean segment text (for subtitles)", "tags": "text with Audio-Tags markup (for voice)"},
     {"text": "next segment.", "tags": "[pause: short] [emphasized] next segment."}
   ],
-	"title": "short title",
+	"title": "short title without num of secret",
   "slug": "short slug for file name (latin, hyphens)",
   "code": "code block to display",
   "codeLang": "go"

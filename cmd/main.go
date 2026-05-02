@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"go-secrets-pipeline/pkg/config"
 	"go-secrets-pipeline/pkg/models"
@@ -14,9 +16,11 @@ import (
 
 func main() {
 	var (
-		fileNum = flag.Int("num", 0, "номер файла для обработки (0 = случайный)")
-		fixNum  = flag.Int("fix", 0, "перегенерировать аудио+видео из существующего сценария")
-		testTTS = flag.String("test-tts", "", "тестовый текст для синтеза TTS")
+		fileNum     = flag.Int("num", 0, "номер файла для обработки (0 = случайный)")
+		fixNum      = flag.Int("fix", 0, "перегенерировать аудио+видео из существующего сценария")
+		publicNum   = flag.Int("public", 0, "опубликовать готовое видео на YouTube")
+		youtubeAuth = flag.Bool("youtube-auth", false, "получить YouTube OAuth refresh token")
+		testTTS     = flag.String("test-tts", "", "тестовый текст для синтеза TTS")
 	)
 	flag.Parse()
 
@@ -42,6 +46,27 @@ func main() {
 		os.Exit(0)
 	}
 
+	if *youtubeAuth {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+
+		yt := services.NewYouTubeService(cfg)
+		refreshToken, channels, err := yt.Authorize(ctx)
+		if err != nil {
+			log.Fatalf("YouTube auth: %v", err)
+		}
+		fmt.Printf("\nYOUTUBE_REFRESH_TOKEN=%s\n", refreshToken)
+		if len(channels) == 0 {
+			fmt.Printf("\n⚠ YouTube API не видит каналов для этого токена.\n")
+		} else {
+			fmt.Printf("\nКаналы, видимые токену:\n")
+			for _, ch := range channels {
+				fmt.Printf("- %s %s (%s)\n", ch.Title, ch.CustomURL, ch.ID)
+			}
+		}
+		os.Exit(0)
+	}
+
 	// Инициализация директорий
 	if err := orchestrator.Init(cfg); err != nil {
 		log.Fatalf("Инициализация: %v", err)
@@ -54,7 +79,14 @@ func main() {
 	}
 
 	var result *models.ProductionResult
-	if *fixNum > 0 {
+	if *publicNum > 0 {
+		upload, err := orch.PublishExisting(*publicNum)
+		if err != nil {
+			log.Fatalf("Ошибка публикации: %v", err)
+		}
+		fmt.Printf("Видео опубликовано: %s\n", upload.VideoURL)
+		return
+	} else if *fixNum > 0 {
 		result, err = orch.RunFix(*fixNum)
 	} else {
 		result, err = orch.Run(*fileNum)

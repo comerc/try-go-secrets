@@ -57,7 +57,52 @@ codex login
 
 Результаты:
 - `output/` — видео, аудио, сценарии
-- `state/` — `processed.json`, `tts_usage.json`
+- `state/` — `processed.json`, `tts_usage.json`, `youtube_schedule.json`
+
+---
+
+## YouTube автопубликация
+
+Финальный шаг пайплайна может автоматически загрузить готовый ролик в YouTube, поставить публикацию в расписание и добавить видео в плейлист.
+
+Включается через `.env`:
+
+```bash
+YOUTUBE_ENABLED=true
+YOUTUBE_CLIENT_ID=...
+YOUTUBE_CLIENT_SECRET=...
+YOUTUBE_REFRESH_TOKEN=...
+YOUTUBE_PLAYLIST_ID=...
+PLAYLIST_TITLE=300 секретов Голанг
+YOUTUBE_SCHEDULE_LOCATION=Europe/Moscow
+YOUTUBE_SCHEDULE_TIME=12:00
+```
+
+Поведение:
+- `Script.Title` отправляется как title ролика.
+- `Script.NarrationText` отправляется в description.
+- `PLAYLIST_TITLE` отображается в заголовке терминала внутри видео.
+- Видео загружается как `private` с `publishAt`, то есть YouTube сам опубликует его в заданное время.
+- Публикация планируется по одному ролику в день. Занятые даты хранятся в `state/youtube_schedule.json`.
+- Ролик добавляется в плейлист `YOUTUBE_PLAYLIST_ID`.
+
+Опубликовать уже готовый ролик без перегенерации:
+
+```bash
+./scripts/public.sh 43
+```
+
+Скрипт найдёт последние `output/scripts/*__043.json` и `output/videos/*__043.mp4`, выберет первую свободную дату и загрузит ролик в YouTube.
+
+`state/youtube_schedule.json` хранит только номер ролика и дату:
+
+```json
+[
+  { "id": "043", "date": "2026-05-03" }
+]
+```
+
+Для OAuth refresh token нужен доступ к YouTube Data API v3 со scope `https://www.googleapis.com/auth/youtube`.
 
 ---
 
@@ -120,3 +165,11 @@ go run ./cmd/main.go -test-tts "Привет мир"
 | `OUTPUT_DIR` | Папка с результатами, по умолчанию `./output` |
 | `STATE_DIR` | Папка с состоянием, по умолчанию `./state` |
 | `LANG` | Язык нарратива: `ru` (по умолчанию), `en`, `es` |
+| `YOUTUBE_ENABLED` | включает финальную загрузку и планирование YouTube |
+| `YOUTUBE_CLIENT_ID` | OAuth client id Google Cloud |
+| `YOUTUBE_CLIENT_SECRET` | OAuth client secret Google Cloud |
+| `YOUTUBE_REFRESH_TOKEN` | refresh token для YouTube Data API |
+| `YOUTUBE_PLAYLIST_ID` | ID плейлиста, куда добавлять ролик |
+| `PLAYLIST_TITLE` | текст в заголовке терминала внутри видео |
+| `YOUTUBE_SCHEDULE_LOCATION` | IANA-таймзона расписания, например `Europe/Moscow` |
+| `YOUTUBE_SCHEDULE_TIME` | время публикации по выбранной таймзоне в формате `HH:MM`, например `13:30` |

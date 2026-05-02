@@ -26,6 +26,11 @@ func NewVideoGenerator(cfg *config.Config, tts *services.TTSService, video *serv
 // Generate создаёт финальный MP4 из сценария и контента
 func (g *VideoGenerator) Generate(script *models.Script, content *models.RawContent) (*models.ProductionResult, error) {
 	date := time.Now().Format("2006-01-02")
+	return g.GenerateForDate(script, content, date)
+}
+
+// GenerateForDate создаёт финальный MP4 с датой артефактов YYYY-MM-DD.
+func (g *VideoGenerator) GenerateForDate(script *models.Script, content *models.RawContent, date string) (*models.ProductionResult, error) {
 	result := &models.ProductionResult{
 		FileNum: script.FileNum,
 		Slug:    script.Slug,
@@ -38,20 +43,20 @@ func (g *VideoGenerator) Generate(script *models.Script, content *models.RawCont
 	}
 	audioPath := filepath.Join(audioDir, fmt.Sprintf("%s__%03d.wav", date, script.FileNum))
 
-	voice, err := g.tts.SelectVoice(script.Voice)
-	if err != nil {
-		return nil, fmt.Errorf("выбор голоса TTS: %w", err)
-	}
-	script.Voice = voice
+	// voice, err := g.tts.SelectVoice(script.Voice)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("выбор голоса TTS: %w", err)
+	// }
+	// script.Voice = voice
 
-	fmt.Printf("  🎙  Синтез голоса (Audio-Tags, %s)...\n", voice)
-	ttsText := script.NarrationTags
-	if ttsText == "" {
-		ttsText = script.NarrationText
-	}
-	if err := g.tts.Synthesize(ttsText, voice, audioPath); err != nil {
-		return nil, fmt.Errorf("TTS синтез: %w", err)
-	}
+	// fmt.Printf("  🎙  Синтез голоса (Audio-Tags, %s)...\n", voice)
+	// ttsText := script.NarrationTags
+	// if ttsText == "" {
+	// 	ttsText = script.NarrationText
+	// }
+	// if err := g.tts.Synthesize(ttsText, voice, audioPath); err != nil {
+	// 	return nil, fmt.Errorf("TTS синтез: %w", err)
+	// }
 	result.AudioPath = audioPath
 
 	// Измеряем реальную длительность аудио для точной синхронизации субтитров
@@ -90,12 +95,13 @@ func (g *VideoGenerator) Generate(script *models.Script, content *models.RawCont
 
 	if displayCode != "" {
 		spec := &models.VideoSpec{
-			Slug:       script.Slug,
-			AudioPath:  audioPath,
-			OutputPath: videoPath,
-			Width:      g.cfg.VideoWidth,
-			Height:     g.cfg.VideoHeight,
-			FPS:        g.cfg.VideoFPS,
+			Slug:          script.Slug,
+			AudioPath:     audioPath,
+			OutputPath:    videoPath,
+			Width:         g.cfg.VideoWidth,
+			Height:        g.cfg.VideoHeight,
+			FPS:           g.cfg.VideoFPS,
+			PlaylistTitle: g.cfg.PlaylistTitle,
 		}
 
 		fmt.Printf("  🎬  Рендер видео (Puppeteer)...\n")
