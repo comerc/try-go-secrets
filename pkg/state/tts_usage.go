@@ -9,7 +9,7 @@ import (
 
 type TTSUsageState struct {
 	path  string
-	Daily map[string]int `json:"daily"` // "YYYY-MM-DD" -> кол-во символов
+	Daily map[string]int // "YYYY-MM-DD" -> кол-во символов
 }
 
 func LoadTTSUsage(stateDir string) (*TTSUsageState, error) {
@@ -27,7 +27,7 @@ func LoadTTSUsage(stateDir string) (*TTSUsageState, error) {
 		return nil, err
 	}
 
-	if err := json.Unmarshal(data, s); err != nil {
+	if err := json.Unmarshal(data, &s.Daily); err != nil {
 		return nil, err
 	}
 	return s, nil
@@ -43,7 +43,7 @@ func (s *TTSUsageState) Add(chars int) error {
 }
 
 func (s *TTSUsageState) save() error {
-	data, err := json.MarshalIndent(s, "", "  ")
+	data, err := json.MarshalIndent(s.Daily, "", "  ")
 	if err != nil {
 		return err
 	}

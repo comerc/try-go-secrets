@@ -97,9 +97,9 @@ YOUTUBE_SCHEDULE_TIME=12:00
 `state/youtube_schedule.json` хранит только номер ролика и дату:
 
 ```json
-[
-  { "id": "043", "date": "2026-05-03" }
-]
+{
+  "043": "2026-05-03"
+}
 ```
 
 Для OAuth refresh token нужен доступ к YouTube Data API v3 со scope `https://www.googleapis.com/auth/youtube`.

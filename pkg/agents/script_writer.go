@@ -56,7 +56,7 @@ func buildSystemPrompt(lang string) (string, error) {
 		langName = "русский"
 	}
 
-	narrativeLang := fmt.Sprintf("- Язык нарратива и субтитров: %s (%s)", langName, lang)
+	narrativeLang := fmt.Sprintf("- Язык заголовка, нарратива и субтитров: %s (%s)", langName, lang)
 	codeLang := fmt.Sprintf("- Комментарии в коде пиши на %s", langName)
 	narrationSection, err := readAudioTagsInstruction()
 	if err != nil {

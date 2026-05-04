@@ -5,26 +5,20 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 )
-
-type YouTubeScheduleEntry struct {
-	ID   string `json:"id"`
-	Date string `json:"date"`
-}
 
 type YouTubeScheduleState struct {
 	path   string
-	byDate map[string]YouTubeScheduleEntry
-	byID   map[string]YouTubeScheduleEntry
+	byDate map[string]string
+	byID   map[string]string
 }
 
 func LoadYouTubeSchedule(stateDir string) (*YouTubeScheduleState, error) {
 	path := filepath.Join(stateDir, "youtube_schedule.json")
 	s := &YouTubeScheduleState{
 		path:   path,
-		byDate: make(map[string]YouTubeScheduleEntry),
-		byID:   make(map[string]YouTubeScheduleEntry),
+		byDate: make(map[string]string),
+		byID:   make(map[string]string),
 	}
 
 	data, err := os.ReadFile(path)
@@ -35,22 +29,17 @@ func LoadYouTubeSchedule(stateDir string) (*YouTubeScheduleState, error) {
 		return nil, err
 	}
 
-	var entries []YouTubeScheduleEntry
-	if err := json.Unmarshal(data, &entries); err == nil {
-		for _, e := range entries {
-			s.addLoaded(e)
+	var entries map[string]string
+	if err := json.Unmarshal(data, &entries); err != nil {
+		return nil, fmt.Errorf("ошибка чтения youtube_schedule.json: ожидается JSON-объект id -> date")
+	}
+	for id, date := range entries {
+		if id != "" && date != "" {
+			s.byID[id] = date
+			s.byDate[date] = id
 		}
-		return s, nil
 	}
-
-	return nil, fmt.Errorf("ошибка чтения youtube_schedule.json: ожидается JSON-массив")
-}
-
-func (s *YouTubeScheduleState) addLoaded(entry YouTubeScheduleEntry) {
-	if entry.ID != "" && entry.Date != "" {
-		s.byDate[entry.Date] = entry
-		s.byID[entry.ID] = entry
-	}
+	return s, nil
 }
 
 func FormatVideoID(fileNum int) string {
@@ -75,17 +64,16 @@ func (s *YouTubeScheduleState) Reserve(id, date string) error {
 		return fmt.Errorf("date is empty")
 	}
 	if existing, ok := s.byID[id]; ok {
-		if existing.Date == date {
+		if existing == date {
 			return nil
 		}
-		return fmt.Errorf("id %s already scheduled for %s", id, existing.Date)
+		return fmt.Errorf("id %s already scheduled for %s", id, existing)
 	}
 	if existing, ok := s.byDate[date]; ok {
-		return fmt.Errorf("date %s already reserved by %s", date, existing.ID)
+		return fmt.Errorf("date %s already reserved by %s", date, existing)
 	}
-	entry := YouTubeScheduleEntry{ID: id, Date: date}
-	s.byDate[date] = entry
-	s.byID[id] = entry
+	s.byDate[date] = id
+	s.byID[id] = date
 	return s.save()
 }
 
@@ -94,18 +82,7 @@ func (s *YouTubeScheduleState) save() error {
 		return err
 	}
 
-	dates := make([]string, 0, len(s.byDate))
-	for date := range s.byDate {
-		dates = append(dates, date)
-	}
-	sort.Strings(dates)
-
-	out := make([]YouTubeScheduleEntry, 0, len(dates))
-	for _, date := range dates {
-		out = append(out, s.byDate[date])
-	}
-
-	data, err := json.MarshalIndent(out, "", "  ")
+	data, err := json.MarshalIndent(s.byID, "", "  ")
 	if err != nil {
 		return err
 	}
