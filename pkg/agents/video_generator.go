@@ -54,19 +54,19 @@ func (g *VideoGenerator) GenerateForDate(script *models.Script, content *models.
 	}
 	script.Voice = voice
 
-	// fmt.Printf("  🎙  Синтез голоса (Audio-Tags, %s)...\n", voice)
-	// ttsText := script.NarrationTags
-	// if ttsText == "" {
-	// 	ttsText = script.NarrationText
-	// }
-	// if err := g.tts.Synthesize(ttsText, voice, audioPath); err != nil {
-	// 	return nil, fmt.Errorf("TTS синтез: %w", err)
-	// }
-	// if g.onTTSUsage != nil {
-	// 	if err := g.onTTSUsage(len([]rune(script.NarrationText))); err != nil {
-	// 		return nil, fmt.Errorf("запись tts_usage.json: %w", err)
-	// 	}
-	// }
+	fmt.Printf("  🎙  Синтез голоса (Audio-Tags, %s)...\n", voice)
+	ttsText := script.NarrationTags
+	if ttsText == "" {
+		ttsText = script.NarrationText
+	}
+	if err := g.tts.Synthesize(ttsText, voice, audioPath); err != nil {
+		return nil, fmt.Errorf("TTS синтез: %w", err)
+	}
+	if g.onTTSUsage != nil {
+		if err := g.onTTSUsage(len([]rune(script.NarrationText))); err != nil {
+			return nil, fmt.Errorf("запись tts_usage.json: %w", err)
+		}
+	}
 	result.AudioPath = audioPath
 
 	// Измеряем реальную длительность аудио для точной синхронизации субтитров
