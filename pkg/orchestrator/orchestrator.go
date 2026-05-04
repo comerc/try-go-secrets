@@ -63,7 +63,7 @@ func New(cfg *config.Config) (*Orchestrator, error) {
 		tts:        tts,
 		video:      video,
 		youtube:    youtubeSvc,
-		writer:     agents.NewScriptWriter(llm, tts, cfg.Lang),
+		writer:     agents.NewScriptWriter(llm, tts, cfg.VideoLang),
 		checker:    agents.NewQualityChecker(video),
 		gen:        agents.NewVideoGenerator(cfg, tts, video),
 	}, nil

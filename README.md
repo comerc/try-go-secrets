@@ -164,7 +164,7 @@ go run ./cmd/main.go -test-tts "Привет мир"
 | `RAW_DIR` | Папка с markdown-файлами, по умолчанию `./raw` |
 | `OUTPUT_DIR` | Папка с результатами, по умолчанию `./output` |
 | `STATE_DIR` | Папка с состоянием, по умолчанию `./state` |
-| `LANG` | Язык нарратива: `ru` (по умолчанию), `en`, `es` |
+| `CURRENT_LANGUAGE` | Язык нарратива: `ru` (по умолчанию), `en`, `es` |
 | `YOUTUBE_ENABLED` | включает финальную загрузку и планирование YouTube |
 | `YOUTUBE_CLIENT_ID` | OAuth client id Google Cloud |
 | `YOUTUBE_CLIENT_SECRET` | OAuth client secret Google Cloud |

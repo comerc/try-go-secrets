@@ -30,7 +30,7 @@ type Config struct {
 	PlaylistTitle string `envconfig:"PLAYLIST_TITLE"`
 
 	// Language: ru (default), en, cn, hi, ja, es
-	Lang string `envconfig:"LANG" default:"ru"`
+	VideoLang string `envconfig:"VIDEO_LANG" default:"ru"`
 
 	// LLM backend: "codex-cli" (default), "claude-cli", or "zai-api"
 	LLMBackend string `envconfig:"LLM_BACKEND" default:"codex-cli"`

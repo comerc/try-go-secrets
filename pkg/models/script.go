@@ -11,8 +11,8 @@ type Script struct {
 	NarrationTags string    // текст с Audio-Tags в квадратных скобках для TTS
 	Segments      []Segment // тайминговые сегменты
 	TotalSeconds  float64
-	DisplayCode   string // код для отображения в терминале (Go или bash)
-	DisplayLang   string // язык: "go" или "bash"
+	Code          string // код для отображения в терминале (Go или bash)
+	CodeLang      string // язык: "go" или "bash"
 }
 
 type Segment struct {

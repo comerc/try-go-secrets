@@ -79,8 +79,8 @@ func (g *VideoGenerator) GenerateForDate(script *models.Script, content *models.
 
 	// Код для отображения: приоритет у script.DisplayCode (сгенерирован LLM),
 	// fallback — оригинальный код из raw-файла
-	displayCode := script.DisplayCode
-	displayLang := script.DisplayLang
+	displayCode := script.Code
+	displayLang := script.CodeLang
 	if displayCode == "" {
 		if len(content.CodeBlocks) > 0 {
 			displayCode = content.CodeBlocks[0].Code

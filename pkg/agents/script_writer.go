@@ -29,9 +29,6 @@ type ScriptWriter struct {
 }
 
 func NewScriptWriter(llm *services.LLMService, tts *services.TTSService, lang string) *ScriptWriter {
-	if lang == "" {
-		lang = "ru"
-	}
 	return &ScriptWriter{llm: llm, tts: tts, lang: lang}
 }
 
@@ -123,7 +120,7 @@ func (sw *ScriptWriter) Write(content *models.RawContent) (*models.Script, error
 		return nil, fmt.Errorf("script_writer LLM: %w", err)
 	}
 
-	llmSegs, title, slug, displayCode, displayLang, err := parseScriptJSON(raw)
+	llmSegs, title, slug, code, codeLang, err := parseScriptJSON(raw)
 	if err != nil {
 		return nil, err
 	}
@@ -163,8 +160,8 @@ func (sw *ScriptWriter) Write(content *models.RawContent) (*models.Script, error
 		NarrationTags: narrationTags,
 		TotalSeconds:  math.Round(duration*10) / 10,
 		Segments:      buildSegments(llmSegs),
-		DisplayCode:   displayCode,
-		DisplayLang:   displayLang,
+		Code:          code,
+		CodeLang:      codeLang,
 	}
 
 	return script, nil
