@@ -18,7 +18,7 @@ pick_free_port() {
   fi
 
   if [ -n "${PUPPETEER_PORT:-}" ]; then
-    echo "⚠ Порт $PUPPETEER_PORT занят, ищу свободный..." >&2
+    echo "✗ Порт $PUPPETEER_PORT занят, ищу свободный..." >&2
   fi
 
   for _ in $(seq 1 100); do

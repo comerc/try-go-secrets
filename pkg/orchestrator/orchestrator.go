@@ -34,7 +34,9 @@ type Orchestrator struct {
 }
 
 func New(cfg *config.Config) (*Orchestrator, error) {
-	ps, err := state.LoadProcessed(cfg.StateDir)
+	langStateDir := cfg.LangStateDir()
+
+	ps, err := state.LoadProcessed(langStateDir)
 	if err != nil {
 		return nil, fmt.Errorf("загрузка processed state: %w", err)
 	}
@@ -44,7 +46,7 @@ func New(cfg *config.Config) (*Orchestrator, error) {
 		return nil, fmt.Errorf("загрузка tts_usage state: %w", err)
 	}
 
-	ytSchedule, err := state.LoadYouTubeSchedule(cfg.StateDir)
+	ytSchedule, err := state.LoadYouTubeSchedule(langStateDir)
 	if err != nil {
 		return nil, fmt.Errorf("загрузка youtube_schedule state: %w", err)
 	}
@@ -54,7 +56,7 @@ func New(cfg *config.Config) (*Orchestrator, error) {
 	video := services.NewVideoService(cfg)
 	youtubeSvc := services.NewYouTubeService(cfg)
 
-	return &Orchestrator{
+	orch := &Orchestrator{
 		cfg:        cfg,
 		processed:  ps,
 		ttsUsage:   ttsUsage,
@@ -66,7 +68,20 @@ func New(cfg *config.Config) (*Orchestrator, error) {
 		writer:     agents.NewScriptWriter(llm, tts, cfg.VideoLang),
 		checker:    agents.NewQualityChecker(video),
 		gen:        agents.NewVideoGenerator(cfg, tts, video),
-	}, nil
+	}
+	orch.gen.SetTTSUsageRecorder(orch.recordTTSUsage)
+	return orch, nil
+}
+
+func (o *Orchestrator) recordTTSUsage(chars int) error {
+	before := o.ttsUsage.TodayUsage()
+	after, err := o.ttsUsage.Add(chars)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("  ℹ  TTS сегодня: %d + 1 = %d запусков, %d + %d = %d символов\n",
+		before.Runs, after.Runs, before.Chars, chars, after.Chars)
+	return nil
 }
 
 // Run запускает полный пайплайн для одного файла
@@ -75,6 +90,7 @@ func (o *Orchestrator) Run(fileNum int) (*models.ProductionResult, error) {
 	start := time.Now()
 
 	fmt.Printf("\n━━━ Go Secrets Pipeline ━━━\n")
+	fmt.Printf("Язык: %s\n", o.cfg.VideoLang)
 	if fileNum > 0 {
 		fmt.Printf("Файл: #%d\n\n", fileNum)
 	} else {
@@ -108,13 +124,8 @@ func (o *Orchestrator) Run(fileNum int) (*models.ProductionResult, error) {
 	if err != nil {
 		return nil, fmt.Errorf("генерация сценария: %w", err)
 	}
-	fmt.Printf("  ✓  Slug: %s, длина нарратива: %d симв (~%.0fs)\n",
-		script.Slug, len([]rune(script.NarrationText)), script.TotalSeconds)
-
-	// Проверяем TTS лимит (информационно, не блокируем)
-	todayChars := o.ttsUsage.TodayUsage()
-	narrationChars := len([]rune(script.NarrationText))
-	fmt.Printf("  ℹ  TTS сегодня: %d символов использовано\n", todayChars)
+	fmt.Printf("  ✓  Длина нарратива: %d симв (~%.0fs)\n",
+		len([]rune(script.NarrationText)), script.TotalSeconds)
 
 	// Сохраняем сценарий
 	scriptPath, err := o.writer.Save(script, o.cfg.OutputDir)
@@ -146,10 +157,7 @@ func (o *Orchestrator) Run(fileNum int) (*models.ProductionResult, error) {
 
 	// Обновляем состояние
 	if err := o.processed.Add(num); err != nil {
-		log.Printf("⚠ Ошибка записи processed.json: %v", err)
-	}
-	if err := o.ttsUsage.Add(narrationChars); err != nil {
-		log.Printf("⚠ Ошибка записи tts_usage.json: %v", err)
+		log.Printf("✗ Ошибка записи processed.json: %v", err)
 	}
 
 	elapsed := time.Since(start).Round(time.Second)
@@ -181,9 +189,10 @@ func (o *Orchestrator) publishToYouTube(script *models.Script, result *models.Pr
 	}
 
 	fmt.Printf("  ✓  YouTube: %s\n", upload.VideoURL)
+	fmt.Printf("  ✓  Имя файла: %s\n", upload.FileName)
 	fmt.Printf("  ✓  Запланировано: %s\n", upload.PublishAt.Format(time.RFC3339))
 	if upload.PlaylistWarning != "" {
-		fmt.Printf("  ⚠  Ролик загружен, но не добавлен в плейлист: %s\n", upload.PlaylistWarning)
+		fmt.Printf("  ✗  Ролик загружен, но не добавлен в плейлист: %s\n", upload.PlaylistWarning)
 	}
 	return nil
 }
@@ -233,10 +242,11 @@ func parseScheduleTime(value string) (int, int, error) {
 	return hour, minute, nil
 }
 
-// PublishExisting публикует уже готовый ролик из output/scripts и output/videos.
+// PublishExisting публикует уже готовый ролик из output/<lang>/scripts и output/<lang>/videos.
 func (o *Orchestrator) PublishExisting(fileNum int) (*services.YouTubeUploadResult, error) {
 	log.SetFlags(log.Ltime)
 	fmt.Printf("\n━━━ YouTube публикация #%d ━━━\n\n", fileNum)
+	fmt.Printf("Язык: %s\n\n", o.cfg.VideoLang)
 
 	script, scriptPath, err := o.loadLatestScript(fileNum)
 	if err != nil {
@@ -252,7 +262,6 @@ func (o *Orchestrator) PublishExisting(fileNum int) (*services.YouTubeUploadResu
 
 	result := &models.ProductionResult{
 		FileNum:    script.FileNum,
-		Slug:       script.Slug,
 		VideoPath:  videoPath,
 		ScriptPath: scriptPath,
 		Success:    true,
@@ -281,9 +290,10 @@ func (o *Orchestrator) PublishExisting(fileNum int) (*services.YouTubeUploadResu
 	}
 
 	fmt.Printf("  ✓  YouTube: %s\n", upload.VideoURL)
+	fmt.Printf("  ✓  Имя файла: %s\n", upload.FileName)
 	fmt.Printf("  ✓  Запланировано: %s\n\n", upload.PublishAt.Format(time.RFC3339))
 	if upload.PlaylistWarning != "" {
-		fmt.Printf("  ⚠  Ролик загружен, но не добавлен в плейлист: %s\n", upload.PlaylistWarning)
+		fmt.Printf("  ✗  Ролик загружен, но не добавлен в плейлист: %s\n", upload.PlaylistWarning)
 	}
 	return upload, nil
 }
@@ -327,8 +337,9 @@ func ensureOutputDirs(cfg *config.Config) error {
 		filepath.Join(cfg.OutputDir, "scripts"),
 		filepath.Join(cfg.OutputDir, "audio"),
 		filepath.Join(cfg.OutputDir, "videos"),
-		filepath.Join(cfg.OutputDir, "logs"),
+		filepath.Join(cfg.OutputDir, "raw"),
 		cfg.StateDir,
+		cfg.LangStateDir(),
 	}
 	for _, d := range dirs {
 		if err := os.MkdirAll(d, 0755); err != nil {
@@ -344,10 +355,11 @@ func Init(cfg *config.Config) error {
 }
 
 // RunFix перегенерирует аудио и видео из существующего сценария (без запроса к LLM).
-// Используется после ручной правки output/scripts/*__NNN.json.
+// Используется после ручной правки output/<lang>/scripts/*__NNN.json.
 func (o *Orchestrator) RunFix(fileNum int) (*models.ProductionResult, error) {
 	log.SetFlags(log.Ltime)
 	fmt.Printf("\n━━━ Fix: перегенерация #%d ━━━\n\n", fileNum)
+	fmt.Printf("Язык: %s\n\n", o.cfg.VideoLang)
 
 	// Находим файл сценария по номеру
 	pattern := filepath.Join(o.cfg.OutputDir, "scripts", fmt.Sprintf("*__%03d.json", fileNum))

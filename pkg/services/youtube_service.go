@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -34,6 +35,7 @@ type YouTubeUploadRequest struct {
 type YouTubeUploadResult struct {
 	VideoID         string
 	VideoURL        string
+	FileName        string
 	PublishAt       time.Time
 	PlaylistWarning string
 }
@@ -156,7 +158,11 @@ func (s *YouTubeService) Upload(ctx context.Context, req YouTubeUploadRequest) (
 		},
 	}
 
-	created, err := yt.Videos.Insert([]string{"snippet", "status"}, video).Media(file).Do()
+	fileName := uploadFileName(req)
+	insert := yt.Videos.Insert([]string{"snippet", "status"}, video).Media(file)
+	insert.Header().Set("Slug", fileName)
+
+	created, err := insert.Do()
 	if err != nil {
 		return nil, fmt.Errorf("youtube upload: %w", err)
 	}
@@ -166,6 +172,7 @@ func (s *YouTubeService) Upload(ctx context.Context, req YouTubeUploadRequest) (
 		return &YouTubeUploadResult{
 			VideoID:         created.Id,
 			VideoURL:        "https://www.youtube.com/watch?v=" + created.Id,
+			FileName:        fileName,
 			PublishAt:       req.PublishAt,
 			PlaylistWarning: err.Error(),
 		}, nil
@@ -174,8 +181,18 @@ func (s *YouTubeService) Upload(ctx context.Context, req YouTubeUploadRequest) (
 	return &YouTubeUploadResult{
 		VideoID:   created.Id,
 		VideoURL:  "https://www.youtube.com/watch?v=" + created.Id,
+		FileName:  fileName,
 		PublishAt: req.PublishAt,
 	}, nil
+}
+
+func uploadFileName(req YouTubeUploadRequest) string {
+	if req.Result.VideoPath != "" {
+		if base := filepath.Base(req.Result.VideoPath); base != "." && base != string(filepath.Separator) {
+			return base
+		}
+	}
+	return "video.mp4"
 }
 
 func (s *YouTubeService) validateConfig() error {

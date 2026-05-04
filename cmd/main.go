@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"time"
 
 	"go-secrets-pipeline/pkg/config"
@@ -18,7 +19,7 @@ func main() {
 	var (
 		fileNum     = flag.Int("num", 0, "номер файла для обработки (0 = случайный)")
 		fixNum      = flag.Int("fix", 0, "перегенерировать аудио+видео из существующего сценария")
-		publicNum   = flag.Int("public", 0, "опубликовать готовое видео на YouTube")
+		pubNum      = flag.Int("pub", 0, "опубликовать готовое видео на YouTube")
 		youtubeAuth = flag.Bool("youtube-auth", false, "получить YouTube OAuth refresh token")
 		testTTS     = flag.String("test-tts", "", "тестовый текст для синтеза TTS")
 	)
@@ -32,7 +33,10 @@ func main() {
 	// Режим тестирования TTS
 	if *testTTS != "" {
 		tts := services.NewTTSService(cfg)
-		outPath := "output/audio/test-tts.wav"
+		outPath := filepath.Join(cfg.OutputDir, "audio", "test-tts.wav")
+		if err := os.MkdirAll(filepath.Dir(outPath), 0o755); err != nil {
+			log.Fatalf("Директория TTS: %v", err)
+		}
 		fmt.Printf("Синтез: %q\n", *testTTS)
 		voice, err := tts.SelectVoice("")
 		if err != nil {
@@ -57,7 +61,7 @@ func main() {
 		}
 		fmt.Printf("\nYOUTUBE_REFRESH_TOKEN=%s\n", refreshToken)
 		if len(channels) == 0 {
-			fmt.Printf("\n⚠ YouTube API не видит каналов для этого токена.\n")
+			fmt.Printf("\n✗ YouTube API не видит каналов для этого токена.\n")
 		} else {
 			fmt.Printf("\nКаналы, видимые токену:\n")
 			for _, ch := range channels {
@@ -79,8 +83,8 @@ func main() {
 	}
 
 	var result *models.ProductionResult
-	if *publicNum > 0 {
-		upload, err := orch.PublishExisting(*publicNum)
+	if *pubNum > 0 {
+		upload, err := orch.PublishExisting(*pubNum)
 		if err != nil {
 			log.Fatalf("Ошибка публикации: %v", err)
 		}

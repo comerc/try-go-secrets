@@ -44,7 +44,10 @@ codex login
 
 # 3. Конкретный файл по номеру
 ./scripts/run.sh 43
-# → output/videos/YYYY-MM-DD__NNN.mp4
+# → output/ru/videos/YYYY-MM-DD__NNN.mp4
+
+# Другой язык на один запуск
+VIDEO_LANG=es ./scripts/run.sh 43
 
 # 4. Случайный необработанный файл
 ./scripts/run.sh
@@ -56,8 +59,9 @@ codex login
 `run.sh` запускает pipeline локально (`go run ./cmd/main.go`). Если Puppeteer ещё не установлен, скрипт сам сделает `npm install` в `puppeteer/`, поднимет сервис на свободном порту и дождётся `/health`.
 
 Результаты:
-- `output/` — видео, аудио, сценарии
-- `state/` — `processed.json`, `tts_usage.json`, `youtube_schedule.json`
+- `output/<VIDEO_LANG>/` — видео, аудио, сценарии
+- `state/tts_usage.json` — общий учёт TTS
+- `state/<VIDEO_LANG>/` — `processed.json`, `youtube_schedule.json`
 
 ---
 
@@ -72,29 +76,29 @@ YOUTUBE_ENABLED=true
 YOUTUBE_CLIENT_ID=...
 YOUTUBE_CLIENT_SECRET=...
 YOUTUBE_REFRESH_TOKEN=...
-YOUTUBE_PLAYLIST_ID=...
-PLAYLIST_TITLE=300 секретов Голанг
-YOUTUBE_SCHEDULE_LOCATION=Europe/Moscow
-YOUTUBE_SCHEDULE_TIME=12:00
+YOUTUBE_PLAYLIST_ID_RU=...
+TERMINAL_TITLE_RU=300 секретов Golang
+YOUTUBE_SCHEDULE_LOCATION_RU=Europe/Moscow
+YOUTUBE_SCHEDULE_TIME_RU=12:00
 ```
 
 Поведение:
 - `Script.Title` отправляется как title ролика.
 - `Script.NarrationText` отправляется в description.
-- `PLAYLIST_TITLE` отображается в заголовке терминала внутри видео.
+- `TERMINAL_TITLE_<VIDEO_LANG>` отображается в заголовке терминала внутри видео.
 - Видео загружается как `private` с `publishAt`, то есть YouTube сам опубликует его в заданное время.
-- Публикация планируется по одному ролику в день. Занятые даты хранятся в `state/youtube_schedule.json`.
-- Ролик добавляется в плейлист `YOUTUBE_PLAYLIST_ID`.
+- Публикация планируется по одному ролику в день. Занятые даты хранятся в `state/<VIDEO_LANG>/youtube_schedule.json`.
+- Ролик добавляется в плейлист `YOUTUBE_PLAYLIST_ID_<VIDEO_LANG>`.
 
 Опубликовать уже готовый ролик без перегенерации:
 
 ```bash
-./scripts/public.sh 43
+./scripts/pub.sh 43
 ```
 
-Скрипт найдёт последние `output/scripts/*__043.json` и `output/videos/*__043.mp4`, выберет первую свободную дату и загрузит ролик в YouTube.
+Скрипт найдёт последние `output/<VIDEO_LANG>/scripts/*__043.json` и `output/<VIDEO_LANG>/videos/*__043.mp4`, выберет первую свободную дату и загрузит ролик в YouTube.
 
-`state/youtube_schedule.json` хранит только номер ролика и дату:
+`state/<VIDEO_LANG>/youtube_schedule.json` хранит только номер ролика и дату:
 
 ```json
 {
@@ -113,7 +117,7 @@ YOUTUBE_SCHEDULE_TIME=12:00
 **1. Найти сценарий**
 
 ```
-output/scripts/YYYY-MM-DD__NNN.json
+output/ru/scripts/YYYY-MM-DD__NNN.json
 ```
 
 **2. Отредактировать поля**
@@ -142,7 +146,7 @@ go test ./tests/...
 
 # Тест TTS изолированно
 go run ./cmd/main.go -test-tts "Привет мир"
-# → output/audio/test-tts.wav
+# → output/ru/audio/test-tts.wav
 
 # Puppeteer поднимается автоматически через `./scripts/run.sh` и `./scripts/fix.sh`
 ```
@@ -154,22 +158,25 @@ go run ./cmd/main.go -test-tts "Привет мир"
 | Переменная | Описание |
 |---|---|
 | `LLM_BACKEND` | `codex-cli` — Codex CLI, `claude-cli` — Claude Code CLI, `zai-api` — z.ai API |
-| `LLM_MODEL` | Модель для Codex, Claude и z.ai (`glm-5.1` по умолчанию для z.ai) |
+| `LLM_MODEL` | модель для Codex, Claude и z.ai (`glm-5.1` по умолчанию для z.ai) |
 | `LLM_EFFORT` | уровень effort/thinking для LLM-бэкенда |
-| `ZAI_API_KEY` | Ключ z.ai API |
-| `GEMINI_API_KEY` | Ключ Gemini API для TTS |
-| `GEMINI_TTS_MODEL` | Модель Gemini TTS, по умолчанию `gemini-3.1-flash-tts-preview` |
-| `GEMINI_TTS_VOICE` | Голос Gemini TTS; если пусто, выбирается случайно из `x-voices.md` |
+| `ZAI_API_KEY` | ключ z.ai API |
+| `GEMINI_API_KEY` | ключ Gemini API для TTS |
+| `GEMINI_TTS_MODEL` | модель Gemini TTS, по умолчанию `gemini-3.1-flash-tts-preview` |
+| `GEMINI_TTS_VOICE` | голос Gemini TTS; если пусто, выбирается случайно из `x-voices.md` |
 | `PUPPETEER_URL` | URL локального puppeteer-сервиса, подбирается автоматически |
-| `RAW_DIR` | Папка с markdown-файлами, по умолчанию `./raw` |
-| `OUTPUT_DIR` | Папка с результатами, по умолчанию `./output` |
-| `STATE_DIR` | Папка с состоянием, по умолчанию `./state` |
-| `CURRENT_LANGUAGE` | Язык нарратива: `ru` (по умолчанию), `en`, `es` |
+| `RAW_DIR` | папка с markdown-файлами, по умолчанию `./raw` |
+| `OUTPUT_DIR` | базовая папка с результатами, по умолчанию `./output`; язык добавляется автоматически |
+| `STATE_DIR` | базовая папка с состоянием, по умолчанию `./state`; язык добавляется автоматически |
+| `VIDEO_LANG` | язык нарратива и подпапок: `ru` (по умолчанию), `en-us`, `es` |
+| `VIDEO_WIDTH` | ширина видео в пикселях, по умолчанию `1080` |
+| `VIDEO_HEIGHT` | высота видео в пикселях, по умолчанию `1920` |
+| `VIDEO_FPS` | частота кадров, по умолчанию `30` |
+| `TERMINAL_TITLE_<LANG>` | текст в заголовке терминала внутри видео, например `TERMINAL_TITLE_EN_US` |
 | `YOUTUBE_ENABLED` | включает финальную загрузку и планирование YouTube |
 | `YOUTUBE_CLIENT_ID` | OAuth client id Google Cloud |
 | `YOUTUBE_CLIENT_SECRET` | OAuth client secret Google Cloud |
 | `YOUTUBE_REFRESH_TOKEN` | refresh token для YouTube Data API |
-| `YOUTUBE_PLAYLIST_ID` | ID плейлиста, куда добавлять ролик |
-| `PLAYLIST_TITLE` | текст в заголовке терминала внутри видео |
-| `YOUTUBE_SCHEDULE_LOCATION` | IANA-таймзона расписания, например `Europe/Moscow` |
-| `YOUTUBE_SCHEDULE_TIME` | время публикации по выбранной таймзоне в формате `HH:MM`, например `13:30` |
+| `YOUTUBE_PLAYLIST_ID_<LANG>` | ID плейлиста для языка, например `YOUTUBE_PLAYLIST_ID_RU` |
+| `YOUTUBE_SCHEDULE_LOCATION_<LANG>` | IANA-таймзона расписания, например `YOUTUBE_SCHEDULE_LOCATION_RU=Europe/Moscow` |
+| `YOUTUBE_SCHEDULE_TIME_<LANG>` | время публикации по выбранной таймзоне в формате `HH:MM`, например `YOUTUBE_SCHEDULE_TIME_RU=13:30` |

@@ -11,7 +11,6 @@ import (
 
 type ProcessedEntry struct {
 	FileNum   int    `json:"file_num"`
-	Slug      string `json:"slug"`
 	VideoPath string `json:"video_path"`
 	Date      string `json:"date"`
 }

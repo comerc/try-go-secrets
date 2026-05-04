@@ -29,14 +29,13 @@ type SubtitleWord struct {
 type renderRequest struct {
 	Code          string         `json:"code"`
 	Lang          string         `json:"lang"`
-	Slug          string         `json:"slug"`
 	OutputPath    string         `json:"outputPath"`
 	Width         int            `json:"width"`
 	Height        int            `json:"height"`
 	FPS           int            `json:"fps"`
 	AudioDuration float64        `json:"audioDuration"`
 	SubtitleWords []SubtitleWord `json:"subtitleWords"`
-	PlaylistTitle string         `json:"playlistTitle"`
+	TerminalTitle string         `json:"terminalTitle"`
 }
 
 type renderResponse struct {
@@ -55,7 +54,7 @@ func NewVideoService(cfg *config.Config) *VideoService {
 // RenderCodeVideo запрашивает у Puppeteer-сервиса видео с анимацией кода
 func (s *VideoService) RenderCodeVideo(spec *models.VideoSpec, code, lang string, audioDuration float64, subtitleWords []SubtitleWord) (string, error) {
 	rawVideoPath := filepath.Join(
-		s.cfg.OutputDir, "videos", "raw", spec.Slug+"-code.mp4",
+		s.cfg.OutputDir, "raw", filepath.Base(spec.OutputPath),
 	)
 	absRawVideoPath, err := filepath.Abs(rawVideoPath)
 	if err != nil {
@@ -68,14 +67,13 @@ func (s *VideoService) RenderCodeVideo(spec *models.VideoSpec, code, lang string
 	reqBody := renderRequest{
 		Code:          code,
 		Lang:          lang,
-		Slug:          spec.Slug,
 		OutputPath:    absRawVideoPath,
 		Width:         spec.Width,
 		Height:        spec.Height,
 		FPS:           spec.FPS,
 		AudioDuration: audioDuration,
 		SubtitleWords: subtitleWords,
-		PlaylistTitle: spec.PlaylistTitle,
+		TerminalTitle: spec.TerminalTitle,
 	}
 
 	data, err := json.Marshal(reqBody)

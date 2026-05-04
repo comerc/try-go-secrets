@@ -38,23 +38,12 @@ type llmSegment struct {
 	Tags string `json:"tags"`
 }
 
-// langNames — название языка для промпта
-var langNames = map[string]string{
-	"ru": "русский",
-	"en": "English",
-	"es": "español",
-}
-
 // buildSystemPrompt формирует системный промпт с учётом языка вывода
 func buildSystemPrompt(lang string) (string, error) {
-	langName, ok := langNames[lang]
-	if !ok {
-		lang = "ru"
-		langName = "русский"
-	}
 
-	narrativeLang := fmt.Sprintf("- Язык заголовка, нарратива и субтитров: %s (%s)", langName, lang)
-	codeLang := fmt.Sprintf("- Комментарии в коде пиши на %s", langName)
+	narrativeLang := fmt.Sprintf("- Language/locale for title, narration, and subtitles: %s", lang)
+	commentLang := fmt.Sprintf("- Write code comments in the same language/locale: %s", lang)
+
 	narrationSection, err := readAudioTagsInstruction()
 	if err != nil {
 		return "", err
@@ -92,10 +81,9 @@ Reply with ONLY JSON:
     {"text": "next segment.", "tags": "[pause: short] [emphasized] next segment."}
   ],
 	"title": "short title without num of secret",
-  "slug": "short slug for file name (latin, hyphens)",
   "code": "code block to display",
   "codeLang": "go"
-}`, narrativeLang, narrationSection, codeLang), nil
+}`, narrativeLang, narrationSection, commentLang), nil
 }
 
 // Write генерирует сценарий для видео из контента
@@ -112,7 +100,7 @@ func (sw *ScriptWriter) Write(content *models.RawContent) (*models.Script, error
 		mainCode = content.OldBlocks[0]
 	}
 
-	userPrompt := fmt.Sprintf("Секрет Go #%d:\n\n%s\n\nКод:\n```go\n%s\n```",
+	userPrompt := fmt.Sprintf("Golang Secret #%d:\n\n%s\n\nCode:\n```go\n%s\n```",
 		content.FileNum, content.Explanation, mainCode)
 
 	raw, err := sw.llm.Complete(systemPrompt, userPrompt)
@@ -120,7 +108,7 @@ func (sw *ScriptWriter) Write(content *models.RawContent) (*models.Script, error
 		return nil, fmt.Errorf("script_writer LLM: %w", err)
 	}
 
-	llmSegs, title, slug, code, codeLang, err := parseScriptJSON(raw)
+	llmSegs, title, code, codeLang, err := parseScriptJSON(raw)
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +141,6 @@ func (sw *ScriptWriter) Write(content *models.RawContent) (*models.Script, error
 	script := &models.Script{
 		FileNum:       content.FileNum,
 		Title:         title,
-		Slug:          sanitizeSlug(slug),
 		Voice:         voice,
 		SourceFile:    content.FilePath,
 		NarrationText: narrationText,
@@ -186,7 +173,7 @@ func (sw *ScriptWriter) Save(script *models.Script, outputDir string) (string, e
 	return path, os.WriteFile(path, data, 0644)
 }
 
-func parseScriptJSON(raw string) (segments []llmSegment, title, slug, code, codeLang string, err error) {
+func parseScriptJSON(raw string) (segments []llmSegment, title, code, codeLang string, err error) {
 	// Вырезаем JSON из возможной обёртки в markdown
 	re := regexp.MustCompile("(?s)```(?:json)?\\s*(\\{.*?\\})\\s*```")
 	if m := re.FindStringSubmatch(raw); m != nil {
@@ -196,17 +183,16 @@ func parseScriptJSON(raw string) (segments []llmSegment, title, slug, code, code
 	var result struct {
 		Segments []llmSegment `json:"segments"`
 		Title    string       `json:"title"`
-		Slug     string       `json:"slug"`
 		Code     string       `json:"code"`
 		CodeLang string       `json:"codeLang"`
 	}
 	if err := json.Unmarshal([]byte(strings.TrimSpace(raw)), &result); err != nil {
-		return nil, "", "", "", "", err
+		return nil, "", "", "", err
 	}
 	if result.CodeLang == "" {
 		result.CodeLang = "go"
 	}
-	return result.Segments, result.Title, result.Slug, result.Code, result.CodeLang, nil
+	return result.Segments, result.Title, result.Code, result.CodeLang, nil
 }
 
 func readAudioTagsInstruction() (string, error) {
@@ -253,18 +239,4 @@ func buildSegments(llmSegs []llmSegment) []models.Segment {
 		cursor += dur
 	}
 	return segments
-}
-
-var reNonSlug = regexp.MustCompile(`[^a-z0-9\-]`)
-
-func sanitizeSlug(s string) string {
-	s = strings.ToLower(s)
-	s = strings.ReplaceAll(s, " ", "-")
-	s = reNonSlug.ReplaceAllString(s, "")
-	s = regexp.MustCompile(`-+`).ReplaceAllString(s, "-")
-	s = strings.Trim(s, "-")
-	if s == "" {
-		s = "go-secret"
-	}
-	return s
 }

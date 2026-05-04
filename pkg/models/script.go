@@ -4,7 +4,6 @@ package models
 type Script struct {
 	FileNum       int
 	Title         string
-	Slug          string
 	Voice         string
 	SourceFile    string
 	NarrationText string    // чистый текст для субтитров и оценки длительности

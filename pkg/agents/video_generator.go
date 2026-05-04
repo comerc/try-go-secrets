@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -14,13 +15,18 @@ import (
 )
 
 type VideoGenerator struct {
-	cfg   *config.Config
-	tts   *services.TTSService
-	video *services.VideoService
+	cfg        *config.Config
+	tts        *services.TTSService
+	video      *services.VideoService
+	onTTSUsage func(chars int) error
 }
 
 func NewVideoGenerator(cfg *config.Config, tts *services.TTSService, video *services.VideoService) *VideoGenerator {
 	return &VideoGenerator{cfg: cfg, tts: tts, video: video}
+}
+
+func (g *VideoGenerator) SetTTSUsageRecorder(fn func(chars int) error) {
+	g.onTTSUsage = fn
 }
 
 // Generate создаёт финальный MP4 из сценария и контента
@@ -33,7 +39,6 @@ func (g *VideoGenerator) Generate(script *models.Script, content *models.RawCont
 func (g *VideoGenerator) GenerateForDate(script *models.Script, content *models.RawContent, date string) (*models.ProductionResult, error) {
 	result := &models.ProductionResult{
 		FileNum: script.FileNum,
-		Slug:    script.Slug,
 	}
 
 	// 1. Синтез голоса
@@ -49,14 +54,19 @@ func (g *VideoGenerator) GenerateForDate(script *models.Script, content *models.
 	}
 	script.Voice = voice
 
-	fmt.Printf("  🎙  Синтез голоса (Audio-Tags, %s)...\n", voice)
-	ttsText := script.NarrationTags
-	if ttsText == "" {
-		ttsText = script.NarrationText
-	}
-	if err := g.tts.Synthesize(ttsText, voice, audioPath); err != nil {
-		return nil, fmt.Errorf("TTS синтез: %w", err)
-	}
+	// fmt.Printf("  🎙  Синтез голоса (Audio-Tags, %s)...\n", voice)
+	// ttsText := script.NarrationTags
+	// if ttsText == "" {
+	// 	ttsText = script.NarrationText
+	// }
+	// if err := g.tts.Synthesize(ttsText, voice, audioPath); err != nil {
+	// 	return nil, fmt.Errorf("TTS синтез: %w", err)
+	// }
+	// if g.onTTSUsage != nil {
+	// 	if err := g.onTTSUsage(len([]rune(script.NarrationText))); err != nil {
+	// 		return nil, fmt.Errorf("запись tts_usage.json: %w", err)
+	// 	}
+	// }
 	result.AudioPath = audioPath
 
 	// Измеряем реальную длительность аудио для точной синхронизации субтитров
@@ -77,7 +87,7 @@ func (g *VideoGenerator) GenerateForDate(script *models.Script, content *models.
 	}
 	result.VideoPath = videoPath
 
-	// Код для отображения: приоритет у script.DisplayCode (сгенерирован LLM),
+	// Код для отображения: приоритет у script.Code (сгенерирован LLM),
 	// fallback — оригинальный код из raw-файла
 	displayCode := script.Code
 	displayLang := script.CodeLang
@@ -95,17 +105,16 @@ func (g *VideoGenerator) GenerateForDate(script *models.Script, content *models.
 
 	if displayCode != "" {
 		spec := &models.VideoSpec{
-			Slug:          script.Slug,
 			AudioPath:     audioPath,
 			OutputPath:    videoPath,
 			Width:         g.cfg.VideoWidth,
 			Height:        g.cfg.VideoHeight,
 			FPS:           g.cfg.VideoFPS,
-			PlaylistTitle: g.cfg.PlaylistTitle,
+			TerminalTitle: g.cfg.TerminalTitle,
 		}
 
 		fmt.Printf("  🎬  Рендер видео (Puppeteer)...\n")
-		rawVideoPath, err := g.video.RenderCodeVideo(spec, displayCode, displayLang, actualAudioDur, buildSubtitleWords(script.Segments, timeScale))
+		rawVideoPath, err := g.video.RenderCodeVideo(spec, displayCode, displayLang, actualAudioDur, buildSubtitleWords(script.Segments, timeScale, g.cfg.VideoLang))
 		if err != nil {
 			return nil, fmt.Errorf("рендер видео: %w", err)
 		}
@@ -129,7 +138,7 @@ func (g *VideoGenerator) GenerateForDate(script *models.Script, content *models.
 	// 4. Получаем длительность финального видео
 	dur, err := g.video.GetDuration(videoPath)
 	if err != nil {
-		fmt.Printf("  ⚠  Не удалось получить длительность: %v\n", err)
+		fmt.Printf("  ✗  Не удалось получить длительность: %v\n", err)
 	}
 	result.DurationSec = dur
 	result.Success = true
@@ -141,10 +150,10 @@ func (g *VideoGenerator) GenerateForDate(script *models.Script, content *models.
 // buildSubtitleWords разбивает сегменты сценария на слова с временными метками.
 // Внутри каждого сегмента слова распределяются пропорционально длине (в рунах).
 // Символ + (ударение для TTS) убирается из отображаемого текста.
-func buildSubtitleWords(segments []models.Segment, timeScale float64) []services.SubtitleWord {
+func buildSubtitleWords(segments []models.Segment, timeScale float64, videoLang string) []services.SubtitleWord {
 	var words []services.SubtitleWord
 	for _, seg := range segments {
-		segWords := strings.Fields(seg.Text)
+		segWords := subtitleFields(normalizeSubtitleText(seg.Text, videoLang))
 		if len(segWords) == 0 {
 			continue
 		}
@@ -166,6 +175,21 @@ func buildSubtitleWords(segments []models.Segment, timeScale float64) []services
 		}
 	}
 	return words
+}
+
+var frenchDetachedPunctuation = regexp.MustCompile(`\s+([?!:;])`)
+
+func normalizeSubtitleText(text, videoLang string) string {
+	if strings.HasPrefix(strings.ToLower(videoLang), "fr") {
+		return frenchDetachedPunctuation.ReplaceAllString(text, "\u202f$1")
+	}
+	return text
+}
+
+func subtitleFields(text string) []string {
+	return strings.FieldsFunc(text, func(r rune) bool {
+		return r != '\u00a0' && r != '\u202f' && strings.ContainsRune(" \t\n\r\v\f", r)
+	})
 }
 
 // createAudioOnlyVideo создаёт видео с тёмным фоном и только аудио

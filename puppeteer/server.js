@@ -20,26 +20,26 @@ app.get('/terminal', (req, res) => {
 });
 
 // POST /render — генерирует MP4 из переданного кода
-// Body: { code, lang, slug, outputPath, width, height, fps, audioDuration, narration }
+// Body: { code, lang, outputPath, width, height, fps, audioDuration, narration }
 app.post('/render', async (req, res) => {
   const {
     code,
     lang = 'go',
-    slug,
     outputPath,
     width = 1080,
     height = 1920,
     fps = 30,
     audioDuration = 50,
     subtitleWords = [],
-    playlistTitle = '',
+    terminalTitle = '',
   } = req.body;
 
   if (!code || !outputPath) {
     return res.status(400).json({ error: 'code и outputPath обязательны' });
   }
 
-  const screenshotsDir = path.join(path.dirname(outputPath), 'frames', slug || 'tmp');
+  const frameSetName = path.basename(outputPath, path.extname(outputPath));
+  const screenshotsDir = path.join(path.dirname(outputPath), 'frames', frameSetName);
   fs.mkdirSync(screenshotsDir, { recursive: true });
 
   let browser;
@@ -100,7 +100,7 @@ app.post('/render', async (req, res) => {
         if (typeof updateCode === 'function') updateCode(text, language);
         if (typeof updateSubtitle === 'function') updateSubtitle(words, wordIdx);
         if (typeof updateTerminalTitle === 'function') updateTerminalTitle(title);
-      }, partial, lang, subtitleDisplayWords, currentWordIdx, playlistTitle);
+      }, partial, lang, subtitleDisplayWords, currentWordIdx, terminalTitle);
 
       const framePath = path.join(screenshotsDir, `frame-${String(frame).padStart(6, '0')}.png`);
       await page.screenshot({ path: framePath, type: 'png' });
