@@ -180,3 +180,7 @@ go run ./cmd/main.go -test-tts "Привет мир"
 | `YOUTUBE_PLAYLIST_ID_<LANG>` | ID плейлиста для языка, например `YOUTUBE_PLAYLIST_ID_RU` |
 | `YOUTUBE_SCHEDULE_LOCATION_<LANG>` | IANA-таймзона расписания, например `YOUTUBE_SCHEDULE_LOCATION_RU=Europe/Moscow` |
 | `YOUTUBE_SCHEDULE_TIME_<LANG>` | время публикации по выбранной таймзоне в формате `HH:MM`, например `YOUTUBE_SCHEDULE_TIME_RU=13:30` |
+
+---
+
+YOUTUBE_ENABLED=true ./scripts/runs.sh
