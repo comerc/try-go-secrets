@@ -148,16 +148,16 @@ func (o *Orchestrator) Run(fileNum int) (*models.ProductionResult, error) {
 		return result, fmt.Errorf("контроль качества: %w", err)
 	}
 
+	// Фиксируем обработку после успешного создания и QC, независимо от YouTube.
+	if err := o.processed.Add(num); err != nil {
+		log.Printf("✗ Ошибка записи processed.json: %v", err)
+	}
+
 	if o.cfg.YouTubeEnabled {
 		fmt.Printf("[6/%d] Публикация YouTube...\n", steps)
 		if err := o.publishToYouTube(script, result); err != nil {
 			return result, fmt.Errorf("публикация YouTube: %w", err)
 		}
-	}
-
-	// Обновляем состояние
-	if err := o.processed.Add(num); err != nil {
-		log.Printf("✗ Ошибка записи processed.json: %v", err)
 	}
 
 	elapsed := time.Since(start).Round(time.Second)
