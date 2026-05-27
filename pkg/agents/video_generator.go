@@ -59,6 +59,9 @@ func (g *VideoGenerator) GenerateForDate(script *models.Script, content *models.
 	if ttsText == "" {
 		ttsText = script.NarrationText
 	}
+	if err := services.ValidateGeminiAudioTags(ttsText); err != nil {
+		return nil, fmt.Errorf("валидация Audio-Tags: %w", err)
+	}
 	if err := g.tts.Synthesize(ttsText, voice, audioPath); err != nil {
 		return nil, fmt.Errorf("TTS синтез: %w", err)
 	}

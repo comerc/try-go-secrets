@@ -124,7 +124,7 @@ output/ru/scripts/YYYY-MM-DD__NNN.json
 
 | Поле | Что менять |
 |---|---|
-| `NarrationTags` | Audio-Tags для TTS — эмоции (`[friendly]`), паузы (`[pause: short]`), акцент (`[emphasized] слово`) |
+| `NarrationTags` | Gemini TTS markup tags для озвучки, например `[short pause]`, `[whispering]`; официальный список: https://docs.cloud.google.com/text-to-speech/docs/gemini-tts#markup_tag_guide |
 | `NarrationText` | Чистый текст субтитров (без Audio-Tags) |
 | `Segments[].Text` | Текст отдельного сегмента субтитров |
 

@@ -65,7 +65,11 @@ start_puppeteer() {
     (cd "$PUPPETEER_DIR" && npm install >/dev/null 2>"$PUPPETEER_INSTALL_LOG_FILE")
   fi
 
-  (cd "$PUPPETEER_DIR" && PORT="$PUPPETEER_PORT" npm start >/dev/null 2>"$PUPPETEER_LOG_FILE" & echo $! > "$PUPPETEER_PID_FILE")
+  (
+    cd "$PUPPETEER_DIR"
+    PORT="$PUPPETEER_PORT" nohup node server.js </dev/null >/dev/null 2>"$PUPPETEER_LOG_FILE" &
+    echo $! > "$PUPPETEER_PID_FILE"
+  )
 
   for _ in $(seq 1 30); do
     if is_healthy; then

@@ -53,7 +53,7 @@ func (s *TTSService) SelectVoice(existing string) (string, error) {
 	return voices[idx.Int64()], nil
 }
 
-// Synthesize генерирует WAV файл из Audio-Tags текста и сохраняет его по outputPath.
+// Synthesize генерирует WAV файл из текста и сохраняет его по outputPath.
 func (s *TTSService) Synthesize(text, voice, outputPath string) error {
 	ctx := context.Background()
 
@@ -66,6 +66,7 @@ func (s *TTSService) Synthesize(text, voice, outputPath string) error {
 	}
 
 	resp, err := client.Models.GenerateContent(ctx, s.cfg.GeminiTTSModel, genai.Text(text), &genai.GenerateContentConfig{
+		ResponseModalities: []string{"AUDIO"},
 		SpeechConfig: &genai.SpeechConfig{
 			VoiceConfig: &genai.VoiceConfig{
 				PrebuiltVoiceConfig: &genai.PrebuiltVoiceConfig{

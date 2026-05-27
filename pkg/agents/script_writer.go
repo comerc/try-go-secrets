@@ -60,6 +60,8 @@ Narrative rules:
 - FORBIDDEN: read code aloud — do not say variable names, operators, or Go syntax. Explain the MEANING and BEHAVIOUR.
 - FORBIDDEN: use exclamation mark "!" — it creates an unnatural accent in TTS.
 - Use only question marks and periods at the end of sentences.
+- Audio-Tags contract is strict: in the "tags" field, bracketed tags may only come from the allowed list below.
+- If you need emotion, emphasis, or speed that is not in the allowed tag list, express it as natural language in the "tags" text, not as a bracketed tag.
 
 ---
 
@@ -126,6 +128,9 @@ func (sw *ScriptWriter) Write(content *models.RawContent) (*models.Script, error
 	}
 	narrationText := strings.Join(textParts, " ")
 	narrationTags := strings.Join(tagParts, " ")
+	if err := services.ValidateGeminiAudioTags(narrationTags); err != nil {
+		return nil, fmt.Errorf("валидация Audio-Tags: %w", err)
+	}
 
 	// Обрезаем если вышли за лимит (safety net)
 	narrationText = truncateToFit(narrationText, maxDurationSec)
