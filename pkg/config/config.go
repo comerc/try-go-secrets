@@ -17,7 +17,7 @@ type Config struct {
 
 	// Gemini TTS
 	GeminiAPIKey   string `envconfig:"GEMINI_API_KEY" required:"true"`
-	GeminiTTSModel string `envconfig:"GEMINI_TTS_MODEL" default:"gemini-3.1-flash-tts-preview"`
+	GeminiTTSModel string `envconfig:"GEMINI_TTS_MODEL" default:"gemini-2.5-flash-preview-tts"`
 	GeminiTTSVoice string `envconfig:"GEMINI_TTS_VOICE"`
 
 	// Puppeteer

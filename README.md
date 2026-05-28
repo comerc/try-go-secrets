@@ -162,7 +162,7 @@ go run ./cmd/main.go -test-tts "Привет мир"
 | `LLM_EFFORT` | уровень effort/thinking для LLM-бэкенда |
 | `ZAI_API_KEY` | ключ z.ai API |
 | `GEMINI_API_KEY` | ключ Gemini API для TTS |
-| `GEMINI_TTS_MODEL` | модель Gemini TTS, по умолчанию `gemini-3.1-flash-tts-preview` |
+| `GEMINI_TTS_MODEL` | модель Gemini TTS, по умолчанию `gemini-2.5-flash-preview-tts` |
 | `GEMINI_TTS_VOICE` | голос Gemini TTS; если пусто, выбирается случайно из `x-voices.md` |
 | `PUPPETEER_URL` | URL локального puppeteer-сервиса, подбирается автоматически |
 | `RAW_DIR` | папка с markdown-файлами, по умолчанию `./raw` |

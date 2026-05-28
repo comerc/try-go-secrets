@@ -44,7 +44,7 @@ app.post('/render', async (req, res) => {
 
   let browser;
   try {
-    const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || puppeteer.executablePath();
+    const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || await puppeteer.executablePath();
     browser = await puppeteer.launch({
       headless: true,
       executablePath,
